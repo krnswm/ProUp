@@ -24,6 +24,15 @@ interface Project {
   logo?: string;
 }
 
+const LOGO_OPTIONS = [
+  { icon: FolderOpen, name: "Folder", color: "bg-blue-50 text-blue-600" },
+  { icon: GitBranch, name: "Branch", color: "bg-purple-50 text-purple-600" },
+  { icon: Target, name: "Target", color: "bg-orange-50 text-orange-600" },
+  { icon: Zap, name: "Flash", color: "bg-yellow-50 text-yellow-600" },
+  { icon: Shield, name: "Shield", color: "bg-red-50 text-red-600" },
+  { icon: Lock, name: "Lock", color: "bg-green-50 text-green-600" },
+];
+
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([
     {
@@ -32,6 +41,7 @@ export default function Projects() {
       description: "Complete redesign of the company website with modern UI/UX",
       taskCount: 12,
       status: "active",
+      logo: "Folder",
     },
     {
       id: 2,
@@ -39,6 +49,7 @@ export default function Projects() {
       description: "Building a cross-platform mobile app for iOS and Android",
       taskCount: 18,
       status: "active",
+      logo: "Branch",
     },
     {
       id: 3,
@@ -46,6 +57,7 @@ export default function Projects() {
       description: "Integration with third-party APIs for enhanced functionality",
       taskCount: 8,
       status: "active",
+      logo: "Target",
     },
     {
       id: 4,
@@ -53,6 +65,7 @@ export default function Projects() {
       description: "Improving app performance and reducing load times",
       taskCount: 6,
       status: "paused",
+      logo: "Zap",
     },
     {
       id: 5,
@@ -60,6 +73,7 @@ export default function Projects() {
       description: "Comprehensive security audit and vulnerability assessment",
       taskCount: 10,
       status: "completed",
+      logo: "Shield",
     },
   ]);
 
