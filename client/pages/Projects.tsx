@@ -201,6 +201,17 @@ export default function Projects() {
           )}
         </div>
       </div>
+
+      {/* Edit Project Modal */}
+      <ProjectEditModal
+        isOpen={isEditModalOpen}
+        project={editingProject}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingProject(null);
+        }}
+        onSave={handleSaveProject}
+      />
     </MainLayout>
   );
 }
