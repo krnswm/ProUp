@@ -169,6 +169,38 @@ export default function ProjectEditModal({
             </select>
           </div>
 
+          {/* Project Logo */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-3">
+              Project Logo
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {logoOptions.map((logoOption) => {
+                const LogoIcon = logoOption.icon;
+                const isSelected = logo === logoOption.name;
+                return (
+                  <button
+                    key={logoOption.name}
+                    type="button"
+                    onClick={() => setLogo(logoOption.name)}
+                    className={`p-3 rounded-lg border-2 transition-all flex items-center justify-center ${
+                      isSelected
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    title={logoOption.name}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded flex items-center justify-center ${logoOption.color}`}
+                    >
+                      <LogoIcon className="w-4 h-4" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Buttons */}
           <div className="flex gap-3 pt-4">
             <button
