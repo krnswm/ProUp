@@ -105,6 +105,12 @@ export default function Projects() {
 
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const getLogoIcon = (logoName?: string) => {
+    const logo = LOGO_OPTIONS.find((l) => l.name === logoName);
+    return logo || LOGO_OPTIONS[0];
+  };
 
   const handleEditClick = (project: Project) => {
     setEditingProject(project);
@@ -117,6 +123,21 @@ export default function Projects() {
     );
     setIsEditModalOpen(false);
     setEditingProject(null);
+  };
+
+  const handleCreateProject = (newProject: Omit<Project, "id">) => {
+    const project: Project = {
+      ...newProject,
+      id: Math.max(...projects.map((p) => p.id), 0) + 1,
+    };
+    setProjects([...projects, project]);
+    setIsCreateModalOpen(false);
+  };
+
+  const handleDeleteProject = (projectId: number) => {
+    if (window.confirm("Are you sure you want to delete this project?")) {
+      setProjects(projects.filter((p) => p.id !== projectId));
+    }
   };
 
   return (
