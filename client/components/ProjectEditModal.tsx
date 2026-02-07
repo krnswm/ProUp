@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
 import { X, AlertCircle } from "lucide-react";
 
+interface Logo {
+  icon: any;
+  name: string;
+  color: string;
+}
+
 interface Project {
   id: number;
   name: string;
   description: string;
   taskCount?: number;
   status?: "active" | "paused" | "completed";
+  logo?: string;
 }
 
 interface ProjectEditModalProps {
@@ -14,6 +21,7 @@ interface ProjectEditModalProps {
   project: Project | null;
   onClose: () => void;
   onSave: (project: Project) => void;
+  logoOptions?: Logo[];
 }
 
 export default function ProjectEditModal({
@@ -21,12 +29,14 @@ export default function ProjectEditModal({
   project,
   onClose,
   onSave,
+  logoOptions = [],
 }: ProjectEditModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"active" | "paused" | "completed">(
     "active"
   );
+  const [logo, setLogo] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,6 +45,7 @@ export default function ProjectEditModal({
       setName(project.name);
       setDescription(project.description);
       setStatus(project.status || "active");
+      setLogo(project.logo || "");
       setError("");
     }
   }, [project, isOpen]);
