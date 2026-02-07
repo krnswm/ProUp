@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
+import { getTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
+import { getActivityLogs } from "./routes/activityLogs";
+import { getCalendarTasks, getFilteredCalendarTasks } from "./routes/calendar";
 
 export function createServer() {
   const app = express();
@@ -18,6 +21,20 @@ export function createServer() {
   });
 
   app.get("/api/demo", handleDemo);
+
+  // Task routes
+  app.get("/api/tasks", getTasks);
+  app.get("/api/tasks/:id", getTask);
+  app.post("/api/tasks", createTask);
+  app.put("/api/tasks/:id", updateTask);
+  app.delete("/api/tasks/:id", deleteTask);
+
+  // Activity log routes
+  app.get("/api/tasks/:taskId/activity-logs", getActivityLogs);
+
+  // Calendar routes
+  app.get("/api/calendar/tasks", getCalendarTasks);
+  app.get("/api/calendar/tasks/filter", getFilteredCalendarTasks);
 
   return app;
 }

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
 import TaskModal from "@/components/TaskModal";
+import ActivityLogModal from "@/components/ActivityLogModal";
 
 export default function ProjectDetails() {
   const { projectId } = useParams();
@@ -11,61 +12,34 @@ export default function ProjectDetails() {
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyTask, setHistoryTask] = useState<Task | undefined>();
 
   const projectName = "Website Redesign";
   const projectDescription = "Complete redesign of the company website with modern UI/UX";
 
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 1,
-      title: "Design homepage layout",
-      assignedUser: "Jane Smith",
-      dueDate: "2024-02-15",
-      status: "done",
-    },
-    {
-      id: 2,
-      title: "Create color palette",
-      assignedUser: "John Doe",
-      dueDate: "2024-02-10",
-      status: "done",
-    },
-    {
-      id: 3,
-      title: "Design product pages",
-      assignedUser: "Sarah Williams",
-      dueDate: "2024-02-20",
-      status: "inprogress",
-    },
-    {
-      id: 4,
-      title: "Implement responsive design",
-      assignedUser: "Mike Johnson",
-      dueDate: "2024-02-25",
-      status: "inprogress",
-    },
-    {
-      id: 5,
-      title: "Setup analytics",
-      assignedUser: "John Doe",
-      dueDate: "2024-03-01",
-      status: "todo",
-    },
-    {
-      id: 6,
-      title: "Performance optimization",
-      assignedUser: "Mike Johnson",
-      dueDate: "2024-03-05",
-      status: "todo",
-    },
-    {
-      id: 7,
-      title: "Browser compatibility testing",
-      assignedUser: "Sarah Williams",
-      dueDate: "2024-03-10",
-      status: "todo",
-    },
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch tasks from backend
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/tasks');
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddTask = () => {
     setEditingTask(undefined);
@@ -77,21 +51,55 @@ export default function ProjectDetails() {
     setIsModalOpen(true);
   };
 
-  const handleSaveTask = (newTask: Omit<Task, "id">) => {
-    if (editingTask) {
-      setTasks(
-        tasks.map((t) =>
-          t.id === editingTask.id ? { ...newTask, id: t.id } : t
-        )
-      );
-    } else {
-      const id = Math.max(...tasks.map((t) => t.id), 0) + 1;
-      setTasks([...tasks, { ...newTask, id }]);
+  const handleViewHistory = (task: Task) => {
+    setHistoryTask(task);
+    setIsHistoryModalOpen(true);
+  };
+
+  const handleSaveTask = async (newTask: Omit<Task, "id">) => {
+    try {
+      if (editingTask) {
+        // Update existing task
+        const response = await fetch(`/api/tasks/${editingTask.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...newTask, userId: 'Current User' }),
+        });
+        
+        if (response.ok) {
+          const updatedTask = await response.json();
+          setTasks(tasks.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+        }
+      } else {
+        // Create new task
+        const response = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...newTask, userId: 'Current User' }),
+        });
+        
+        if (response.ok) {
+          const createdTask = await response.json();
+          setTasks([...tasks, createdTask]);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving task:', error);
     }
   };
 
-  const handleDeleteTask = (taskId: number) => {
-    setTasks(tasks.filter((t) => t.id !== taskId));
+  const handleDeleteTask = async (taskId: number) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setTasks(tasks.filter((t) => t.id !== taskId));
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
   };
 
   const handleDragStart = (task: Task, e: React.DragEvent) => {
@@ -118,13 +126,23 @@ export default function ProjectDetails() {
     setDragOverColumn(null);
   };
 
-  const handleDrop = (status: "todo" | "inprogress" | "done") => {
+  const handleDrop = async (status: "todo" | "inprogress" | "done") => {
     if (draggedTask && draggedTask.status !== status) {
-      setTasks(
-        tasks.map((t) =>
-          t.id === draggedTask.id ? { ...t, status } : t
-        )
-      );
+      try {
+        const updatedTask = { ...draggedTask, status };
+        const response = await fetch(`/api/tasks/${draggedTask.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...updatedTask, userId: 'Current User' }),
+        });
+        
+        if (response.ok) {
+          const savedTask = await response.json();
+          setTasks(tasks.map((t) => (t.id === draggedTask.id ? savedTask : t)));
+        }
+      } catch (error) {
+        console.error('Error updating task status:', error);
+      }
     }
     setDraggedTask(null);
     setDragOverColumn(null);
@@ -183,6 +201,7 @@ export default function ProjectDetails() {
               task={task}
               onEdit={handleEditTask}
               onDelete={handleDeleteTask}
+              onHistory={handleViewHistory}
             />
           </div>
         ))}
@@ -228,6 +247,19 @@ export default function ProjectDetails() {
         onSave={handleSaveTask}
         initialTask={editingTask}
       />
+
+      {/* Activity Log Modal */}
+      {historyTask && (
+        <ActivityLogModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => {
+            setIsHistoryModalOpen(false);
+            setHistoryTask(undefined);
+          }}
+          taskId={historyTask.id}
+          taskTitle={historyTask.title}
+        />
+      )}
     </MainLayout>
   );
 }

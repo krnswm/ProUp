@@ -20,20 +20,23 @@ export default function TaskModal({
   const [assignedUser, setAssignedUser] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [status, setStatus] = useState<"todo" | "inprogress" | "done">("todo");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
 
   useEffect(() => {
     if (initialTask) {
       setTitle(initialTask.title);
-      setDescription("");
+      setDescription(initialTask.description || "");
       setAssignedUser(initialTask.assignedUser);
       setDueDate(initialTask.dueDate);
       setStatus(initialTask.status);
+      setPriority(initialTask.priority);
     } else {
       setTitle("");
       setDescription("");
       setAssignedUser("");
       setDueDate("");
       setStatus("todo");
+      setPriority("medium");
     }
   }, [initialTask, isOpen]);
 
@@ -42,9 +45,11 @@ export default function TaskModal({
     if (title && assignedUser && dueDate) {
       onSave({
         title,
+        description,
         assignedUser,
         dueDate,
         status,
+        priority,
       });
       onClose();
     }
@@ -147,6 +152,24 @@ export default function TaskModal({
               <option value="todo">To Do</option>
               <option value="inprogress">In Progress</option>
               <option value="done">Done</option>
+            </select>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Priority
+            </label>
+            <select
+              value={priority}
+              onChange={(e) =>
+                setPriority(e.target.value as "low" | "medium" | "high")
+              }
+              className="w-full px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
             </select>
           </div>
 

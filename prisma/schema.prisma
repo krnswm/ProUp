@@ -1,0 +1,37 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id           Int           @id @default(autoincrement())
+  title        String
+  description  String?
+  assignedUser String
+  dueDate      String
+  status       String        @default("todo") // "todo" | "inprogress" | "done"
+  priority     String        @default("medium") // "low" | "medium" | "high"
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  activityLogs ActivityLog[]
+}
+
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  taskId     Int
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId     String   // User who made the change
+  actionType String   // "UPDATED_PRIORITY", "UPDATED_STATUS", "UPDATED_ASSIGNEE", "UPDATED_DUE_DATE", "CREATED_TASK"
+  fieldName  String   // "priority", "status", "assignedUser", "dueDate"
+  oldValue   String?  // Previous value (null for creation)
+  newValue   String   // New value
+  timestamp  DateTime @default(now())
+
+  @@index([taskId])
+  @@index([timestamp])
+}
