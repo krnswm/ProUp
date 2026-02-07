@@ -79,6 +79,7 @@ export default function ProjectEditModal({
           name: name.trim(),
           description: description.trim(),
           status,
+          logo,
         });
       }
       setIsLoading(false);
