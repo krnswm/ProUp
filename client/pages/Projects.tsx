@@ -232,9 +232,18 @@ export default function Projects() {
                         )}
                       </div>
                     </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                    </div>
+                    {/* Project Logo */}
+                    {(() => {
+                      const logo = getLogoIcon(project.logo);
+                      const LogoIcon = logo.icon;
+                      return (
+                        <div
+                          className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${logo.color}`}
+                        >
+                          <LogoIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Description */}
