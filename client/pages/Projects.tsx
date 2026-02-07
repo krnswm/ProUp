@@ -77,6 +77,22 @@ export default function Projects() {
     }
   };
 
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const handleEditClick = (project: Project) => {
+    setEditingProject(project);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveProject = (updatedProject: Project) => {
+    setProjects(
+      projects.map((p) => (p.id === updatedProject.id ? updatedProject : p))
+    );
+    setIsEditModalOpen(false);
+    setEditingProject(null);
+  };
+
   return (
     <MainLayout>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
