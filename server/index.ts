@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { authenticate } from "./middleware/authenticate";
 import { handleDemo } from "./routes/demo";
 import { getTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
 import { getActivityLogs } from "./routes/activityLogs";
@@ -19,6 +20,8 @@ import {
   joinProject,
   cancelInvitation,
 } from "./routes/projects";
+import { getDashboardAnalytics } from "./routes/dashboard";
+import { register, login, getCurrentUser, logout, getAllUsers } from "./routes/auth";
 
 export function createServer() {
   const app = express();
@@ -28,13 +31,25 @@ export function createServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Example API routes
+  // Public routes (no authentication required)
   app.get("/api/ping", (_req, res) => {
     const ping = process.env.PING_MESSAGE ?? "ping";
     res.json({ message: ping });
   });
 
   app.get("/api/demo", handleDemo);
+
+  // Auth routes (public - must be before authentication middleware)
+  app.post("/api/auth/register", register);
+  app.post("/api/auth/login", login);
+  app.get("/api/auth/users", getAllUsers);
+  
+  // Apply authentication middleware to all routes below this point
+  app.use(authenticate);
+
+  // Protected auth routes
+  app.get("/api/auth/me", getCurrentUser);
+  app.post("/api/auth/logout", logout);
 
   // Task routes
   app.get("/api/tasks", getTasks);
@@ -49,6 +64,9 @@ export function createServer() {
   // Calendar routes
   app.get("/api/calendar/tasks", getCalendarTasks);
   app.get("/api/calendar/tasks/filter", getFilteredCalendarTasks);
+
+  // Dashboard routes
+  app.get("/api/dashboard/analytics", getDashboardAnalytics);
 
   // Project routes
   app.get("/api/projects", getProjects);

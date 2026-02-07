@@ -5,14 +5,30 @@ import * as invitationService from '../services/invitation';
 
 /**
  * GET /api/projects
- * Fetches all projects with task count
+ * Fetches all projects where user is owner or member
  */
-export const getProjects: RequestHandler = async (_req, res) => {
+export const getProjects: RequestHandler = async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get projects where user is owner OR a member
     const projects = await prisma.project.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId: userId } } },
+        ],
+      },
       include: {
         _count: {
           select: { tasks: true },
+        },
+        owner: {
+          select: { id: true, name: true, email: true },
         },
       },
       orderBy: {

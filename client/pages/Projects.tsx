@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -15,6 +15,7 @@ import {
 import MainLayout from "@/components/MainLayout";
 import ProjectEditModal from "@/components/ProjectEditModal";
 import ProjectCreateModal from "@/components/ProjectCreateModal";
+import { api } from "@/lib/api";
 
 interface Project {
   id: number;
@@ -35,48 +36,43 @@ const LOGO_OPTIONS = [
 ];
 
 export default function Projects() {
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: 1,
-      name: "Website Redesign",
-      description: "Complete redesign of the company website with modern UI/UX",
-      taskCount: 12,
-      status: "active",
-      logo: "Folder",
-    },
-    {
-      id: 2,
-      name: "Mobile App Development",
-      description: "Building a cross-platform mobile app for iOS and Android",
-      taskCount: 18,
-      status: "active",
-      logo: "Branch",
-    },
-    {
-      id: 3,
-      name: "API Integration",
-      description: "Integration with third-party APIs for enhanced functionality",
-      taskCount: 8,
-      status: "active",
-      logo: "Target",
-    },
-    {
-      id: 4,
-      name: "Performance Optimization",
-      description: "Improving app performance and reducing load times",
-      taskCount: 6,
-      status: "paused",
-      logo: "Zap",
-    },
-    {
-      id: 5,
-      name: "Security Audit",
-      description: "Comprehensive security audit and vulnerability assessment",
-      taskCount: 10,
-      status: "completed",
-      logo: "Shield",
-    },
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch projects from API
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await api('/api/projects');
+        if (response.ok) {
+          const data = await response.json();
+          setProjects(data);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Fetch immediately
+    fetchProjects();
+
+    // Poll for updates every 5 seconds for real-time task count updates
+    const interval = setInterval(fetchProjects, 5000);
+
+    // Also refetch when window gains focus
+    const handleFocus = () => {
+      fetchProjects();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Cleanup
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -118,30 +114,61 @@ export default function Projects() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveProject = (updatedProject: Project) => {
-    setProjects(
-      projects.map((p) => (p.id === updatedProject.id ? updatedProject : p))
-    );
+  const handleSaveProject = async (updatedProject: Project) => {
+    try {
+      const response = await api(`/api/projects/${updatedProject.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedProject),
+      });
+      
+      if (response.ok) {
+        const updated = await response.json();
+        setProjects(
+          projects.map((p) => (p.id === updated.id ? updated : p))
+        );
+      }
+    } catch (error) {
+      console.error('Error updating project:', error);
+    }
     setIsEditModalOpen(false);
     setEditingProject(null);
   };
 
-  const handleCreateProject = (newProject: Omit<Project, "id">) => {
-    const project: Project = {
-      ...newProject,
-      id: Math.max(...projects.map((p) => p.id), 0) + 1,
-    };
-    setProjects([...projects, project]);
+  const handleCreateProject = async (newProject: Omit<Project, "id">) => {
+    try {
+      const response = await api('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify(newProject),
+      });
+      
+      if (response.ok) {
+        const created = await response.json();
+        setProjects([...projects, created]);
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
     setIsCreateModalOpen(false);
   };
 
-  const handleDeleteProject = (projectId: number) => {
+  const handleDeleteProject = async (projectId: number) => {
     if (window.confirm("Are you sure you want to delete this project?")) {
-      setProjects(projects.filter((p) => p.id !== projectId));
+      try {
+        const response = await api(`/api/projects/${projectId}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          setProjects(projects.filter((p) => p.id !== projectId));
+        }
+      } catch (error) {
+        console.error('Error deleting project:', error);
+      }
     }
   };
 
   const activeProjects = projects.filter((p) => p.status === "active").length;
+  const pausedProjects = projects.filter((p) => p.status === "paused").length;
   const completedProjects = projects.filter(
     (p) => p.status === "completed"
   ).length;
@@ -174,7 +201,7 @@ export default function Projects() {
               </p>
 
               {/* Project Stats */}
-              <div className="flex items-center gap-4 sm:gap-6">
+              <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
                 <div>
                   <p className="text-2xl sm:text-3xl font-bold text-foreground">
                     {projects.length}
@@ -190,6 +217,15 @@ export default function Projects() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Active
+                  </p>
+                </div>
+                <div className="h-10 w-px bg-border"></div>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-yellow-600">
+                    {pausedProjects}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Paused
                   </p>
                 </div>
                 <div className="h-10 w-px bg-border"></div>
@@ -322,7 +358,10 @@ export default function Projects() {
                 <p className="text-muted-foreground mb-6">
                   Get started by creating your first project
                 </p>
-                <button className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity mx-auto">
+                <button 
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity mx-auto"
+                >
                   <Plus className="w-5 h-5" />
                   Create New Project
                 </button>

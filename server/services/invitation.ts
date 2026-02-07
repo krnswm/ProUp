@@ -284,7 +284,7 @@ export const sendInvitationEmail = async (
   console.log(`${invitation.inviter.name} has invited you to collaborate on the project "${invitation.project.name}".`);
   console.log('');
   console.log(`Click the link below to accept the invitation:`);
-  console.log(`http://localhost:8081/join-project/${invitation.token}`);
+  console.log(`http://localhost:8080/join-project/${invitation.token}`);
   console.log('');
   console.log(`This invitation will expire in 7 days.`);
   console.log('====================================');

@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import MainLayout from '@/components/MainLayout';
 import TaskQuickViewModal from '@/components/TaskQuickViewModal';
+import { api } from '@/lib/api';
 
 // FullCalendar event type - matches backend response from /api/calendar/tasks
 interface CalendarEvent {
@@ -61,7 +62,7 @@ export default function Calendar() {
   const fetchCalendarTasks = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/calendar/tasks');
+      const response = await api('/api/calendar/tasks');
       
       if (response.ok) {
         const data = await response.json();
@@ -83,7 +84,7 @@ export default function Calendar() {
   // Fetch projects for filter dropdown
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects');
+      const response = await api('/api/projects');
       if (response.ok) {
         const data = await response.json();
         setProjects(data);

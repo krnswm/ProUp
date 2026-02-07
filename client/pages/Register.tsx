@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertCircle, CheckCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -11,26 +12,16 @@ export default function Register() {
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, register: authRegister } = useAuth();
 
   useEffect(() => {
     // Redirect to dashboard if already logged in
-    const user = localStorage.getItem("user");
     if (user) {
       navigate("/dashboard", { replace: true });
     }
+  }, [user, navigate]);
 
-    // Initialize demo accounts if not exist
-    const registeredUsers = localStorage.getItem("registeredUsers");
-    if (!registeredUsers) {
-      const demoUsers = [
-        { name: "Demo User", email: "demo@example.com", password: "password" },
-        { name: "John Doe", email: "john@example.com", password: "password" },
-      ];
-      localStorage.setItem("registeredUsers", JSON.stringify(demoUsers));
-    }
-  }, [navigate]);
-
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -51,40 +42,20 @@ export default function Register() {
       return;
     }
 
-    const registeredUsers = JSON.parse(
-      localStorage.getItem("registeredUsers") || "[]"
-    );
-    const userExists = registeredUsers.some(
-      (u: { email: string }) => u.email === email
-    );
-
-    if (userExists) {
-      setError("Account with this email already exists. Please log in.");
-      return;
-    }
-
     setIsLoading(true);
 
-    // Simulate API delay
-    setTimeout(() => {
-      // Add new user to registered users
-      registeredUsers.push({ name, email, password });
-      localStorage.setItem("registeredUsers", JSON.stringify(registeredUsers));
-
-      // Log in the user
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          email,
-          name,
-        })
-      );
-
+    try {
+      await authRegister(email, name, password);
       setSuccess("Account created successfully! Redirecting...");
       setTimeout(() => {
         navigate("/dashboard");
       }, 1000);
-    }, 500);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Registration failed";
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

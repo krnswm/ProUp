@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,12 +21,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { setTheme } = useTheme();
+  const { user, logout } = useAuth();
 
-  const user = JSON.parse(localStorage.getItem("user") || '{"name":"User"}');
-
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -197,15 +201,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
               >
                 <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 flex-shrink-0">
                   <span className="text-xs font-bold text-primary">
-                    {user.name?.charAt(0).toUpperCase()}
+                    {user?.name?.charAt(0).toUpperCase() || "U"}
                   </span>
                 </div>
                 <div className="hidden sm:block min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-foreground truncate">
-                    {user.name}
+                    {user?.name || "User"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {user.email}
+                    {user?.email || ""}
                   </p>
                 </div>
               </motion.button>

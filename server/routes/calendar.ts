@@ -1,18 +1,31 @@
 import { RequestHandler } from 'express';
 import { prisma } from '../prisma';
+import { AuthRequest } from '../middleware/authorize';
 
 /**
  * GET /api/calendar/tasks
- * Fetches all tasks with due dates for calendar display
+ * Fetches tasks with due dates for calendar display (user's projects only)
  * Returns tasks formatted for FullCalendar library
  */
-export const getCalendarTasks: RequestHandler = async (req, res) => {
+export const getCalendarTasks: RequestHandler = async (req: AuthRequest, res) => {
   try {
-    // Fetch all tasks that have a dueDate, including their project info
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Fetch tasks that have a dueDate from user's projects
     const tasks = await prisma.task.findMany({
       where: {
         dueDate: {
           not: null,
+        },
+        project: {
+          OR: [
+            { ownerId: userId },
+            { members: { some: { userId: userId } } },
+          ],
         },
       },
       include: {
@@ -79,14 +92,26 @@ export const getCalendarTasks: RequestHandler = async (req, res) => {
  * GET /api/calendar/tasks/filter
  * Fetches tasks filtered by assignee for calendar display
  */
-export const getFilteredCalendarTasks: RequestHandler = async (req, res) => {
+export const getFilteredCalendarTasks: RequestHandler = async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
     const { assignee, status, priority } = req.query;
 
-    // Build filter conditions
+    // Build filter conditions - only from user's projects
     const whereConditions: any = {
       dueDate: {
         not: null,
+      },
+      project: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId: userId } } },
+        ],
       },
     };
 

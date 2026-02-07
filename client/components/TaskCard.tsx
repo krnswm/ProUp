@@ -9,6 +9,7 @@ export interface Task {
   dueDate: string;
   status: "todo" | "inprogress" | "done";
   priority: "low" | "medium" | "high";
+  projectId?: number | null;
 }
 
 interface TaskCardProps {

@@ -1,19 +1,63 @@
 import MainLayout from "@/components/MainLayout";
 import { Folder, CheckCircle, Clock, ListTodo, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+
+interface DashboardAnalytics {
+  totalProjects: number;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  pendingTasks: number;
+  completionRate: number;
+  avgTasksPerProject: number;
+}
 
 export default function Dashboard() {
-  // Sample data
-  const stats = {
-    totalProjects: 5,
-    totalTasks: 24,
-    completedTasks: 8,
-    pendingTasks: 16,
-  };
+  const [stats, setStats] = useState<DashboardAnalytics>({
+    totalProjects: 0,
+    totalTasks: 0,
+    completedTasks: 0,
+    inProgressTasks: 0,
+    pendingTasks: 0,
+    completionRate: 0,
+    avgTasksPerProject: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const completionPercentage = Math.round(
-    (stats.completedTasks / stats.totalTasks) * 100
-  );
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const response = await api('/api/dashboard/analytics');
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard analytics');
+        }
+        const data = await response.json();
+        setStats(data);
+        setError(null); // Clear any previous errors
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Error fetching analytics:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Fetch immediately
+    fetchAnalytics();
+
+    // Set up polling to refresh data every 10 seconds
+    const interval = setInterval(fetchAnalytics, 10000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, []);
+
+  const completionPercentage = stats.totalTasks > 0 
+    ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
+    : 0;
 
   const summaryCards = [
     {
@@ -49,6 +93,40 @@ export default function Dashboard() {
       borderColor: "border-orange-200",
     },
   ];
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen bg-gradient-to-br from-background via-blue-50/30 dark:via-blue-950/20 to-purple-50/30 dark:to-purple-950/20">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading dashboard...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen bg-gradient-to-br from-background via-blue-50/30 dark:via-blue-950/20 to-purple-50/30 dark:to-purple-950/20">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <p className="text-red-500 mb-2">Failed to load dashboard</p>
+                <p className="text-muted-foreground text-sm">{error}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -100,6 +178,7 @@ export default function Dashboard() {
                           {card.title}
                         </p>
                         <motion.p 
+                          key={card.value}
                           className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground"
                           initial={{ scale: 0.5 }}
                           animate={{ scale: 1 }}
@@ -159,6 +238,7 @@ export default function Dashboard() {
               </div>
               <div className="text-left sm:text-right">
                 <motion.div 
+                  key={completionPercentage}
                   className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-primary via-blue-500 to-purple-600 bg-clip-text text-transparent"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -200,7 +280,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-center p-2 sm:p-3 lg:p-4 bg-secondary rounded-lg border border-border">
                   <p className="text-xl sm:text-2xl font-bold text-foreground">
-                    {Math.ceil((stats.pendingTasks / stats.totalTasks) * 100)}%
+                    {stats.totalTasks > 0 ? Math.ceil((stats.pendingTasks / stats.totalTasks) * 100) : 0}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Remaining</p>
                 </div>
@@ -227,7 +307,7 @@ export default function Dashboard() {
                   Avg. Tasks per Project
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold text-foreground">
-                  {(stats.totalTasks / stats.totalProjects).toFixed(1)}
+                  {stats.avgTasksPerProject.toFixed(1)}
                 </p>
               </div>
               <div>

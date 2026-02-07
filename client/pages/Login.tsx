@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertCircle, CheckCircle, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -10,22 +11,16 @@ export default function Login() {
   const [errorType, setErrorType] = useState<"notfound" | "invalid" | "">();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, login: authLogin } = useAuth();
 
   useEffect(() => {
     // Redirect to dashboard if already logged in
-    const user = localStorage.getItem("user");
     if (user) {
       navigate("/dashboard", { replace: true });
     }
-  }, [navigate]);
+  }, [user, navigate]);
 
-  // Helper function to get or initialize registered users
-  const getRegisteredUsers = () => {
-    const users = localStorage.getItem("registeredUsers");
-    return users ? JSON.parse(users) : [];
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setErrorType(undefined);
@@ -38,37 +33,21 @@ export default function Login() {
 
     setIsLoading(true);
 
-    // Simulate API delay
-    setTimeout(() => {
-      const registeredUsers = getRegisteredUsers();
-      const user = registeredUsers.find(
-        (u: { email: string; password: string }) => u.email === email
-      );
-
-      if (!user) {
-        setError("Account not found. Create a new account to get started.");
-        setErrorType("notfound");
-        setIsLoading(false);
-        return;
-      }
-
-      if (user.password !== password) {
-        setError("Incorrect password. Please try again.");
-        setErrorType("invalid");
-        setIsLoading(false);
-        return;
-      }
-
-      // Successful login
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          email: user.email,
-          name: user.name,
-        })
-      );
+    try {
+      await authLogin(email, password);
       navigate("/dashboard");
-    }, 500);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Login failed";
+      if (errorMessage.includes("credentials")) {
+        setError("Invalid email or password. Please try again.");
+        setErrorType("invalid");
+      } else {
+        setError(errorMessage);
+        setErrorType("invalid");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -244,13 +223,16 @@ export default function Login() {
             </div>
           </motion.div>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-3">
             <p className="text-muted-foreground text-sm">
-              Don't have an account?{" "}
-              <Link to="/register" className="text-primary font-medium hover:opacity-80 transition-opacity">
-                Register here
-              </Link>
+              Don't have an account?
             </p>
+            <Link 
+              to="/register" 
+              className="block w-full py-2.5 rounded-xl font-medium border border-primary text-primary hover:bg-primary/10 transition-all text-center"
+            >
+              Create an Account
+            </Link>
           </div>
         </motion.div>
       </motion.div>

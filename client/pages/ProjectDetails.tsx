@@ -1,38 +1,73 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid } from "lucide-react";
+import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
 import TaskModal from "@/components/TaskModal";
 import ActivityLogModal from "@/components/ActivityLogModal";
+import ProjectMembersTab from "@/components/ProjectMembersTab";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface Project {
+  id: number;
+  name: string;
+  description: string;
+  ownerId: number;
+  status: string;
+}
 
 export default function ProjectDetails() {
   const { projectId } = useParams();
+  const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [historyTask, setHistoryTask] = useState<Task | undefined>();
+  const [activeTab, setActiveTab] = useState<"tasks" | "team">("tasks");
 
-  const projectName = "Website Redesign";
-  const projectDescription = "Complete redesign of the company website with modern UI/UX";
-
+  const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch tasks from backend
+  // Fetch project and tasks from backend
   useEffect(() => {
+    fetchProject();
     fetchTasks();
-  }, []);
+    
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchTasks, 10000);
+    
+    return () => clearInterval(interval);
+  }, [projectId]);
+
+  const fetchProject = async () => {
+    if (!projectId) return;
+    try {
+      const response = await api(`/api/projects/${projectId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProject(data);
+      }
+    } catch (error) {
+      console.error('Error fetching project:', error);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tasks');
+      const response = await api('/api/tasks');
       if (response.ok) {
         const data = await response.json();
-        setTasks(data);
+        // Filter tasks for this project only
+        const projectTasks = projectId 
+          ? data.filter((task: Task) => task.projectId === parseInt(projectId))
+          : data;
+        setTasks(projectTasks);
       }
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -60,10 +95,9 @@ export default function ProjectDetails() {
     try {
       if (editingTask) {
         // Update existing task
-        const response = await fetch(`/api/tasks/${editingTask.id}`, {
+        const response = await api(`/api/tasks/${editingTask.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...newTask, userId: 'Current User' }),
+          body: JSON.stringify({ ...newTask, projectId: projectId ? parseInt(projectId) : null }),
         });
         
         if (response.ok) {
@@ -71,11 +105,10 @@ export default function ProjectDetails() {
           setTasks(tasks.map((t) => (t.id === editingTask.id ? updatedTask : t)));
         }
       } else {
-        // Create new task
-        const response = await fetch('/api/tasks', {
+        // Create new task with projectId
+        const response = await api('/api/tasks', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...newTask, userId: 'Current User' }),
+          body: JSON.stringify({ ...newTask, projectId: projectId ? parseInt(projectId) : null }),
         });
         
         if (response.ok) {
@@ -90,7 +123,7 @@ export default function ProjectDetails() {
 
   const handleDeleteTask = async (taskId: number) => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await api(`/api/tasks/${taskId}`, {
         method: 'DELETE',
       });
       
@@ -130,10 +163,9 @@ export default function ProjectDetails() {
     if (draggedTask && draggedTask.status !== status) {
       try {
         const updatedTask = { ...draggedTask, status };
-        const response = await fetch(`/api/tasks/${draggedTask.id}`, {
+        const response = await api(`/api/tasks/${draggedTask.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...updatedTask, userId: 'Current User' }),
+          body: JSON.stringify(updatedTask),
         });
         
         if (response.ok) {
@@ -151,6 +183,13 @@ export default function ProjectDetails() {
   const getTodoTasks = () => tasks.filter((t) => t.status === "todo");
   const getInProgressTasks = () => tasks.filter((t) => t.status === "inprogress");
   const getDoneTasks = () => tasks.filter((t) => t.status === "done");
+
+  // Calculate task statistics
+  const totalTasks = tasks.length;
+  const completedTasks = getDoneTasks().length;
+  const inProgressTasks = getInProgressTasks().length;
+  const todoTasks = getTodoTasks().length;
+  const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const KanbanColumn = ({
     title,
@@ -209,14 +248,133 @@ export default function ProjectDetails() {
     </div>
   );
 
+  // Determine user's role in the project
+  const currentUserRole = project?.ownerId === user?.id ? "Owner" : "Member";
+
   return (
     <MainLayout>
       <div className="p-8">
         {/* Project Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">{projectName}</h1>
-          <p className="text-muted-foreground mt-2">{projectDescription}</p>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-foreground">{project?.name || "Loading..."}</h1>
+          <p className="text-muted-foreground mt-2">{project?.description}</p>
         </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 border-b border-border">
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px ${
+              activeTab === "tasks"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab("team")}
+            className={`flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px ${
+              activeTab === "team"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Team
+          </button>
+        </div>
+
+        {activeTab === "tasks" ? (
+          <>
+        {/* Task Analytics */}
+        <motion.div 
+          className="mb-8 bg-card rounded-2xl p-6 shadow-lg border border-border"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center gap-2 mb-6">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-bold text-foreground">Task Analytics</h2>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Total Tasks */}
+            <motion.div 
+              className="bg-purple-50 dark:bg-purple-950/20 rounded-xl p-4 border border-purple-200 dark:border-purple-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Total Tasks</p>
+                <ListTodo className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <p className="text-3xl font-bold text-purple-700 dark:text-purple-300">{totalTasks}</p>
+            </motion.div>
+
+            {/* Completed */}
+            <motion.div 
+              className="bg-green-50 dark:bg-green-950/20 rounded-xl p-4 border border-green-200 dark:border-green-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-green-600 dark:text-green-400">Completed</p>
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <p className="text-3xl font-bold text-green-700 dark:text-green-300">{completedTasks}</p>
+            </motion.div>
+
+            {/* In Progress */}
+            <motion.div 
+              className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">In Progress</p>
+                <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">{inProgressTasks}</p>
+            </motion.div>
+
+            {/* To Do */}
+            <motion.div 
+              className="bg-orange-50 dark:bg-orange-950/20 rounded-xl p-4 border border-orange-200 dark:border-orange-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">To Do</p>
+                <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">{todoTasks}</p>
+            </motion.div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-foreground">Overall Completion</span>
+              <span className="font-bold text-primary">{completionPercentage}%</span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary to-purple-600 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${completionPercentage}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+        </motion.div>
 
         {/* Add Task Button */}
         <div className="mb-6 flex justify-end">
@@ -235,6 +393,19 @@ export default function ProjectDetails() {
           <KanbanColumn title="In Progress" tasks={getInProgressTasks()} status="inprogress" />
           <KanbanColumn title="Done" tasks={getDoneTasks()} status="done" />
         </div>
+          </>
+        ) : (
+          /* Team Tab */
+          <div className="bg-card rounded-2xl p-6 shadow-lg border border-border">
+            {project && (
+              <ProjectMembersTab
+                projectId={project.id}
+                projectName={project.name}
+                currentUserRole={currentUserRole}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Task Modal */}

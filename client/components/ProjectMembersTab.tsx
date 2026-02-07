@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Users, UserPlus, Crown, Shield, Eye, MoreVertical, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import InviteMemberModal from "./InviteMemberModal";
+import { api } from "@/lib/api";
 
 interface Member {
   id: number;
@@ -71,7 +72,7 @@ export default function ProjectMembersTab({
   const fetchMembers = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/projects/${projectId}/members`);
+      const response = await api(`/api/projects/${projectId}/members`);
       if (!response.ok) throw new Error("Failed to fetch members");
       const data = await response.json();
       setMembers(data);
@@ -83,9 +84,8 @@ export default function ProjectMembersTab({
   };
 
   const handleInvite = async (email: string, role: string) => {
-    const response = await fetch(`/api/projects/${projectId}/invite`, {
+    const response = await api(`/api/projects/${projectId}/invite`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, role }),
     });
 
@@ -104,7 +104,7 @@ export default function ProjectMembersTab({
     }
 
     try {
-      const response = await fetch(
+      const response = await api(
         `/api/projects/${projectId}/members/${memberId}`,
         { method: "DELETE" }
       );
@@ -120,11 +120,10 @@ export default function ProjectMembersTab({
 
   const handleUpdateRole = async (memberId: number, newRole: string) => {
     try {
-      const response = await fetch(
+      const response = await api(
         `/api/projects/${projectId}/members/${memberId}`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role: newRole }),
         }
       );

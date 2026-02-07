@@ -1,11 +1,32 @@
 import { RequestHandler } from 'express';
 import { prisma } from '../prisma';
 import { logTaskChanges, logTaskCreation } from '../services/activityLog';
+import { AuthRequest } from '../middleware/authorize';
 
-// GET /api/tasks - Get all tasks
-export const getTasks: RequestHandler = async (_req, res) => {
+// GET /api/tasks - Get tasks for the authenticated user's projects
+export const getTasks: RequestHandler = async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get tasks from projects where user is owner or member
     const tasks = await prisma.task.findMany({
+      where: {
+        project: {
+          OR: [
+            { ownerId: userId },
+            { members: { some: { userId: userId } } },
+          ],
+        },
+      },
+      include: {
+        project: {
+          select: { id: true, name: true, color: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
     res.json(tasks);
@@ -36,10 +57,10 @@ export const getTask: RequestHandler = async (req, res) => {
 };
 
 // POST /api/tasks - Create a new task
-export const createTask: RequestHandler = async (req, res) => {
+export const createTask: RequestHandler = async (req: AuthRequest, res) => {
   try {
     const { title, description, assignedUser, dueDate, status, priority, projectId } = req.body;
-    const userId = req.body.userId || 'system'; // In a real app, get this from auth
+    const userId = req.user?.id?.toString() || 'system';
 
     // Create the task
     const task = await prisma.task.create({
@@ -65,12 +86,12 @@ export const createTask: RequestHandler = async (req, res) => {
 };
 
 // PUT /api/tasks/:id - Update a task
-export const updateTask: RequestHandler = async (req, res) => {
+export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const taskId = Array.isArray(id) ? id[0] : id;
     const { title, description, assignedUser, dueDate, status, priority, projectId } = req.body;
-    const userId = req.body.userId || 'system'; // In a real app, get this from auth
+    const userId = req.user?.id?.toString() || 'system';
 
     // Fetch old task data
     const oldTask = await prisma.task.findUnique({

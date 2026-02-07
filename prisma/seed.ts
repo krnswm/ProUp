@@ -18,6 +18,19 @@ async function main() {
 
   console.log(`✅ Created user: ${user.email} (ID: ${user.id})`);
 
+  // Create second demo user
+  const user2 = await prisma.user.upsert({
+    where: { email: 'john@example.com' },
+    update: {},
+    create: {
+      email: 'john@example.com',
+      name: 'John Doe',
+      password: 'password',
+    },
+  });
+
+  console.log(`✅ Created user: ${user2.email} (ID: ${user2.id})`);
+
   // Update existing projects to have the default user as owner
   const projects = await prisma.project.findMany();
   
