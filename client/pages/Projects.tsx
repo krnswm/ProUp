@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, FolderOpen, ArrowRight } from "lucide-react";
+import {
+  Plus,
+  FolderOpen,
+  ArrowRight,
+  Trash2,
+  GitBranch,
+  Target,
+  Shield,
+  Zap,
+  Lock,
+} from "lucide-react";
 import MainLayout from "@/components/MainLayout";
 import ProjectEditModal from "@/components/ProjectEditModal";
+import ProjectCreateModal from "@/components/ProjectCreateModal";
 
 interface Project {
   id: number;
@@ -10,6 +21,7 @@ interface Project {
   description: string;
   taskCount?: number;
   status?: "active" | "paused" | "completed";
+  logo?: string;
 }
 
 export default function Projects() {
