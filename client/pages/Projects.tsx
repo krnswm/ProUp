@@ -169,7 +169,10 @@ export default function Projects() {
                       <span>View Project</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </Link>
-                    <button className="flex-1 px-3 py-2 sm:py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-muted transition-colors border border-border text-sm">
+                    <button
+                      onClick={() => handleEditClick(project)}
+                      className="flex-1 px-3 py-2 sm:py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-muted transition-colors border border-border text-sm"
+                    >
                       Edit
                     </button>
                   </div>
