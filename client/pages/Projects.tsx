@@ -312,6 +312,15 @@ export default function Projects() {
           setEditingProject(null);
         }}
         onSave={handleSaveProject}
+        logoOptions={LOGO_OPTIONS}
+      />
+
+      {/* Create Project Modal */}
+      <ProjectCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={handleCreateProject}
+        logoOptions={LOGO_OPTIONS}
       />
     </MainLayout>
   );
