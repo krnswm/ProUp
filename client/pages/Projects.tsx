@@ -140,24 +140,62 @@ export default function Projects() {
     }
   };
 
+  const activeProjects = projects.filter((p) => p.status === "active").length;
+  const completedProjects = projects.filter(
+    (p) => p.status === "completed"
+  ).length;
+
   return (
     <MainLayout>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                 <div className="w-1 h-6 sm:h-8 bg-primary rounded-full"></div>
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">
                   Projects
                 </h1>
               </div>
-              <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
+              <p className="text-muted-foreground text-sm sm:text-base lg:text-lg mb-4">
                 Manage and organize all your projects in one place
               </p>
+
+              {/* Project Stats */}
+              <div className="flex items-center gap-4 sm:gap-6">
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-foreground">
+                    {projects.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total Projects
+                  </p>
+                </div>
+                <div className="h-10 w-px bg-border"></div>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                    {activeProjects}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Active
+                  </p>
+                </div>
+                <div className="h-10 w-px bg-border"></div>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-600">
+                    {completedProjects}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Completed
+                  </p>
+                </div>
+              </div>
             </div>
-            <button className="flex items-center justify-center sm:justify-start gap-2 bg-primary text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center justify-center sm:justify-start gap-2 bg-primary text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0"
+            >
               <Plus className="w-5 h-5 flex-shrink-0" />
               Create New Project
             </button>
