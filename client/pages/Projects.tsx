@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, FolderOpen, ArrowRight } from "lucide-react";
 import MainLayout from "@/components/MainLayout";
+import ProjectEditModal from "@/components/ProjectEditModal";
 
 interface Project {
   id: number;
@@ -12,7 +13,7 @@ interface Project {
 }
 
 export default function Projects() {
-  const [projects] = useState<Project[]>([
+  const [projects, setProjects] = useState<Project[]>([
     {
       id: 1,
       name: "Website Redesign",
