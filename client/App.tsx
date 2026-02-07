@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -16,8 +16,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const user = localStorage.getItem("user");
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -26,14 +24,8 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             {/* Authentication Routes */}
-            <Route
-              path="/login"
-              element={user ? <Navigate to="/dashboard" /> : <Login />}
-            />
-            <Route
-              path="/register"
-              element={user ? <Navigate to="/dashboard" /> : <Register />}
-            />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
             {/* Protected Routes */}
             <Route
@@ -59,12 +51,6 @@ const App = () => {
                   <ProjectDetails />
                 </ProtectedRoute>
               }
-            />
-
-            {/* Redirect root to login or dashboard */}
-            <Route
-              path="/"
-              element={<Navigate to={user ? "/dashboard" : "/login"} />}
             />
 
             {/* Catch-all 404 */}
