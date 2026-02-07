@@ -42,7 +42,7 @@ export default function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 card-shadow hover:shadow-md transition-shadow">
+    <div className="bg-card border border-border rounded-lg p-4 card-shadow hover:shadow-md transition-shadow select-none" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
       {/* Title */}
       <h3 className="font-semibold text-foreground mb-3 line-clamp-2">
         {task.title}

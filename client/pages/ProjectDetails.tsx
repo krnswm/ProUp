@@ -9,6 +9,8 @@ export default function ProjectDetails() {
   const { projectId } = useParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   const projectName = "Website Redesign";
   const projectDescription = "Complete redesign of the company website with modern UI/UX";
@@ -92,6 +94,42 @@ export default function ProjectDetails() {
     setTasks(tasks.filter((t) => t.id !== taskId));
   };
 
+  const handleDragStart = (task: Task, e: React.DragEvent) => {
+    setDraggedTask(task);
+    // Set drag image opacity
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+    setDraggedTask(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, columnStatus: string) => {
+    e.preventDefault();
+    setDragOverColumn(columnStatus);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null);
+  };
+
+  const handleDrop = (status: "todo" | "inprogress" | "done") => {
+    if (draggedTask && draggedTask.status !== status) {
+      setTasks(
+        tasks.map((t) =>
+          t.id === draggedTask.id ? { ...t, status } : t
+        )
+      );
+    }
+    setDraggedTask(null);
+    setDragOverColumn(null);
+  };
+
   const getTodoTasks = () => tasks.filter((t) => t.status === "todo");
   const getInProgressTasks = () => tasks.filter((t) => t.status === "inprogress");
   const getDoneTasks = () => tasks.filter((t) => t.status === "done");
@@ -99,11 +137,22 @@ export default function ProjectDetails() {
   const KanbanColumn = ({
     title,
     tasks,
+    status,
   }: {
     title: string;
     tasks: Task[];
+    status: "todo" | "inprogress" | "done";
   }) => (
-    <div className="flex-1 min-h-[600px] bg-secondary rounded-lg p-4">
+    <div
+      className={`flex-1 min-h-[600px] rounded-lg p-4 transition-all duration-150 ${
+        dragOverColumn === status
+          ? "bg-secondary border-2 border-border shadow-inner"
+          : "bg-secondary border-2 border-transparent"
+      }`}
+      onDragOver={(e) => handleDragOver(e, status)}
+      onDragLeave={handleDragLeave}
+      onDrop={() => handleDrop(status)}
+    >
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-foreground">{title}</h3>
         <span className="bg-muted text-muted-foreground text-xs font-medium px-2 py-1 rounded">
@@ -113,12 +162,29 @@ export default function ProjectDetails() {
 
       <div className="space-y-3">
         {tasks.map((task) => (
-          <TaskCard
+          <div
             key={task.id}
-            task={task}
-            onEdit={handleEditTask}
-            onDelete={handleDeleteTask}
-          />
+            draggable={true}
+            onDragStart={(e) => {
+              // Prevent drag if clicking on buttons
+              const target = e.target as HTMLElement;
+              if (target.closest('button')) {
+                e.preventDefault();
+                return;
+              }
+              handleDragStart(task, e);
+            }}
+            onDragEnd={(e) => {
+              handleDragEnd(e);
+            }}
+            className="transition-opacity duration-100 cursor-grab active:cursor-grabbing"
+          >
+            <TaskCard
+              task={task}
+              onEdit={handleEditTask}
+              onDelete={handleDeleteTask}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -146,9 +212,9 @@ export default function ProjectDetails() {
 
         {/* Kanban Board */}
         <div className="flex gap-6">
-          <KanbanColumn title="To Do" tasks={getTodoTasks()} />
-          <KanbanColumn title="In Progress" tasks={getInProgressTasks()} />
-          <KanbanColumn title="Done" tasks={getDoneTasks()} />
+          <KanbanColumn title="To Do" tasks={getTodoTasks()} status="todo" />
+          <KanbanColumn title="In Progress" tasks={getInProgressTasks()} status="inprogress" />
+          <KanbanColumn title="Done" tasks={getDoneTasks()} status="done" />
         </div>
       </div>
 

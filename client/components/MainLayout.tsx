@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LayoutDashboard, FolderOpen, LogOut } from "lucide-react";
+import { Menu, X, LayoutDashboard, FolderOpen, LogOut, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -10,6 +18,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { setTheme } = useTheme();
 
   const user = JSON.parse(localStorage.getItem("user") || '{"name":"User"}');
 
@@ -117,34 +126,49 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            {/* User Info */}
-            <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2 bg-secondary rounded-lg min-w-0">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 flex-shrink-0">
-                <span className="text-xs font-bold text-primary">
-                  {user.name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="hidden sm:block min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-foreground truncate">
-                  {user.name}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 text-secondary-foreground hover:bg-muted transition-colors rounded-lg font-medium text-xs sm:text-sm border border-border flex-shrink-0"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
-          </div>
+          {/* User Menu Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2 bg-secondary rounded-lg min-w-0 hover:bg-muted transition-colors cursor-pointer">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 flex-shrink-0">
+                  <span className="text-xs font-bold text-primary">
+                    {user.name?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="hidden sm:block min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-foreground truncate">
+                    {user.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user.email}
+                  </p>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {/* Theme Options */}
+              <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer">
+                <Sun className="mr-2 h-4 w-4" />
+                <span>Light Theme</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer">
+                <Moon className="mr-2 h-4 w-4" />
+                <span>Dark Theme</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                <span>System Theme</span>
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Logout */}
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
 
         {/* Page Content */}
