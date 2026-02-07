@@ -8,12 +8,15 @@ import { prisma } from '../prisma';
  */
 export const getCalendarTasks: RequestHandler = async (req, res) => {
   try {
-    // Fetch all tasks that have a dueDate
+    // Fetch all tasks that have a dueDate, including their project info
     const tasks = await prisma.task.findMany({
       where: {
         dueDate: {
           not: null,
         },
+      },
+      include: {
+        project: true, // Include project data for filtering and display
       },
       orderBy: {
         dueDate: 'asc',
@@ -23,18 +26,22 @@ export const getCalendarTasks: RequestHandler = async (req, res) => {
     // Format tasks for FullCalendar
     // FullCalendar expects: { id, title, start, backgroundColor, extendedProps }
     const calendarEvents = tasks.map((task) => {
-      // Determine background color based on priority
-      let backgroundColor = '#3b82f6'; // Default blue
-      switch (task.priority) {
-        case 'high':
-          backgroundColor = '#ef4444'; // Red
-          break;
-        case 'medium':
-          backgroundColor = '#f59e0b'; // Orange
-          break;
-        case 'low':
-          backgroundColor = '#10b981'; // Green
-          break;
+      // Use project color if available, otherwise use priority-based color
+      let backgroundColor = task.project?.color || '#3b82f6'; // Default blue
+      
+      // If no project color, fall back to priority-based coloring
+      if (!task.project?.color) {
+        switch (task.priority) {
+          case 'high':
+            backgroundColor = '#ef4444'; // Red
+            break;
+          case 'medium':
+            backgroundColor = '#f59e0b'; // Orange
+            break;
+          case 'low':
+            backgroundColor = '#10b981'; // Green
+            break;
+        }
       }
 
       // Override color based on status
@@ -54,6 +61,9 @@ export const getCalendarTasks: RequestHandler = async (req, res) => {
           status: task.status,
           priority: task.priority,
           taskId: task.id,
+          projectId: task.projectId,
+          projectName: task.project?.name || null,
+          projectColor: task.project?.color || null,
         },
       };
     });

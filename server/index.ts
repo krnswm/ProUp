@@ -5,6 +5,20 @@ import { handleDemo } from "./routes/demo";
 import { getTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
 import { getActivityLogs } from "./routes/activityLogs";
 import { getCalendarTasks, getFilteredCalendarTasks } from "./routes/calendar";
+import { 
+  getProjects, 
+  getProject, 
+  createProject, 
+  updateProject, 
+  deleteProject,
+  getProjectMembers,
+  updateMemberRole,
+  removeMember,
+  inviteMember,
+  getProjectInvitations,
+  joinProject,
+  cancelInvitation,
+} from "./routes/projects";
 
 export function createServer() {
   const app = express();
@@ -35,6 +49,24 @@ export function createServer() {
   // Calendar routes
   app.get("/api/calendar/tasks", getCalendarTasks);
   app.get("/api/calendar/tasks/filter", getFilteredCalendarTasks);
+
+  // Project routes
+  app.get("/api/projects", getProjects);
+  app.get("/api/projects/:id", getProject);
+  app.post("/api/projects", createProject);
+  app.put("/api/projects/:id", updateProject);
+  app.delete("/api/projects/:id", deleteProject);
+
+  // Project member routes
+  app.get("/api/projects/:id/members", getProjectMembers);
+  app.patch("/api/projects/:id/members/:memberId", updateMemberRole);
+  app.delete("/api/projects/:id/members/:memberId", removeMember);
+
+  // Project invitation routes
+  app.post("/api/projects/:id/invite", inviteMember);
+  app.get("/api/projects/:id/invitations", getProjectInvitations);
+  app.post("/api/projects/join/:token", joinProject);
+  app.delete("/api/projects/:id/invitations/:invitationId", cancelInvitation);
 
   return app;
 }

@@ -38,7 +38,7 @@ export const getTask: RequestHandler = async (req, res) => {
 // POST /api/tasks - Create a new task
 export const createTask: RequestHandler = async (req, res) => {
   try {
-    const { title, description, assignedUser, dueDate, status, priority } = req.body;
+    const { title, description, assignedUser, dueDate, status, priority, projectId } = req.body;
     const userId = req.body.userId || 'system'; // In a real app, get this from auth
 
     // Create the task
@@ -50,6 +50,7 @@ export const createTask: RequestHandler = async (req, res) => {
         dueDate,
         status: status || 'todo',
         priority: priority || 'medium',
+        projectId: projectId || null,
       },
     });
 
@@ -68,7 +69,7 @@ export const updateTask: RequestHandler = async (req, res) => {
   try {
     const { id } = req.params;
     const taskId = Array.isArray(id) ? id[0] : id;
-    const { title, description, assignedUser, dueDate, status, priority } = req.body;
+    const { title, description, assignedUser, dueDate, status, priority, projectId } = req.body;
     const userId = req.body.userId || 'system'; // In a real app, get this from auth
 
     // Fetch old task data
@@ -90,6 +91,7 @@ export const updateTask: RequestHandler = async (req, res) => {
         dueDate,
         status,
         priority,
+        projectId: projectId !== undefined ? projectId : undefined,
       },
     });
 

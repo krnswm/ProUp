@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Plus,
   FolderOpen,
@@ -147,14 +148,24 @@ export default function Projects() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
+      <div className="min-h-screen bg-gradient-to-br from-background via-blue-50/30 dark:via-blue-950/20 to-purple-50/30 dark:to-purple-950/20">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
+          <motion.div 
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-8 sm:mb-10"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
             <div className="flex-1">
               <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-1 h-6 sm:h-8 bg-primary rounded-full"></div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">
+                <motion.div 
+                  className="w-1 h-6 sm:h-8 bg-gradient-to-b from-primary to-purple-600 rounded-full shadow-lg"
+                  initial={{ scaleY: 0 }}
+                  animate={{ scaleY: 1 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                />
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-purple-600 bg-clip-text text-transparent">
                   Projects
                 </h1>
               </div>
@@ -192,27 +203,38 @@ export default function Projects() {
                 </div>
               </div>
             </div>
-            <button
+            <motion.button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center justify-center sm:justify-start gap-2 bg-primary text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0"
+              className="flex items-center justify-center sm:justify-start gap-2 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all whitespace-nowrap flex-shrink-0 group relative overflow-hidden"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <Plus className="w-5 h-5 flex-shrink-0" />
-              Create New Project
-            </button>
-          </div>
+              <span className="relative z-10 flex items-center gap-2">
+                <Plus className="w-5 h-5 flex-shrink-0 group-hover:rotate-90 transition-transform duration-300" />
+                Create New Project
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </motion.button>
+          </motion.div>
 
           {/* Projects Grid */}
           {projects.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
-              {projects.map((project) => (
-                <div
+              {projects.map((project, index) => (
+                <motion.div
                   key={project.id}
-                  className="bg-card border border-border rounded-lg sm:rounded-xl p-5 sm:p-6 hover:shadow-lg transition-all duration-300 hover:border-primary/20 flex flex-col"
+                  className="group relative bg-card/80 backdrop-blur-sm border border-border rounded-xl sm:rounded-2xl p-5 sm:p-6 shadow-md hover:shadow-2xl transition-all duration-300 hover:border-primary/30 flex flex-col overflow-hidden"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  whileHover={{ y: -8, transition: { duration: 0.2 } }}
                 >
+                  {/* Gradient overlay on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   {/* Card Header */}
-                  <div className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
+                  <div className="relative z-10 flex items-start justify-between gap-3 mb-3 sm:mb-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-1 line-clamp-2">
+                      <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-1 line-clamp-2 group-hover:text-primary transition-colors">
                         {project.name}
                       </h3>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -237,47 +259,54 @@ export default function Projects() {
                       const logo = getLogoIcon(project.logo);
                       const LogoIcon = logo.icon;
                       return (
-                        <div
-                          className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${logo.color}`}
+                        <motion.div
+                          className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${logo.color}`}
+                          whileHover={{ rotate: 5, scale: 1.1 }}
+                          transition={{ duration: 0.2 }}
                         >
                           <LogoIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                        </div>
+                        </motion.div>
                       );
                     })()}
                   </div>
 
                   {/* Description */}
-                  <p className="text-muted-foreground text-sm mb-5 sm:mb-6 line-clamp-3 flex-grow">
+                  <p className="relative z-10 text-muted-foreground text-sm mb-5 sm:mb-6 line-clamp-3 flex-grow">
                     {project.description}
                   </p>
 
                   {/* Divider */}
-                  <div className="border-t border-border mb-4 sm:mb-5"></div>
+                  <div className="relative z-10 border-t border-border/50 mb-4 sm:mb-5"></div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2 sm:gap-3">
+                  <div className="relative z-10 flex gap-2 sm:gap-3">
                     <Link
                       to={`/project/${project.id}`}
-                      className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2 sm:py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity text-sm group"
+                      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground py-2 sm:py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all text-sm group relative overflow-hidden"
                     >
-                      <span>View</span>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                      <span className="relative z-10">View</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform relative z-10" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </Link>
-                    <button
+                    <motion.button
                       onClick={() => handleEditClick(project)}
-                      className="flex-1 px-2 sm:px-3 py-2 sm:py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-muted transition-colors border border-border text-sm"
+                      className="flex-1 px-2 sm:px-3 py-2 sm:py-2.5 bg-secondary/80 backdrop-blur-sm text-secondary-foreground rounded-xl font-medium hover:bg-primary/10 transition-all border border-border/50 text-sm shadow-sm"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
                       Edit
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
                       onClick={() => handleDeleteProject(project.id)}
-                      className="px-2 sm:px-3 py-2 sm:py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-colors border border-red-200 text-sm flex items-center justify-center"
+                      className="px-2 sm:px-3 py-2 sm:py-2.5 bg-red-50/80 dark:bg-red-950/30 backdrop-blur-sm text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-100 dark:hover:bg-red-950/50 transition-all border border-red-200 dark:border-red-800 text-sm flex items-center justify-center shadow-sm"
                       title="Delete project"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </motion.button>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           ) : (

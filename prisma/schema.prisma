@@ -8,14 +8,89 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User model - represents authenticated users
+model User {
+  id        Int             @id @default(autoincrement())
+  email     String          @unique
+  name      String
+  password  String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  
+  // Relations
+  ownedProjects Project[]       @relation("ProjectOwner")
+  memberships   ProjectMember[]
+  invitations   Invitation[]
+}
+
+// Project model - represents a project that contains tasks
+model Project {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String?
+  color       String          @default("#3b82f6") // Default blue color for calendar display
+  status      String          @default("active") // "active" | "paused" | "completed"
+  ownerId     Int             // Owner of the project
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  // Relations
+  tasks       Task[]
+  members     ProjectMember[]
+  invitations Invitation[]
+  
+  @@index([ownerId])
+}
+
+// ProjectMember model - many-to-many relationship with roles
+model ProjectMember {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  userId    Int
+  role      String   @default("Viewer") // "Admin" | "Member" | "Viewer"
+  joinedAt  DateTime @default(now())
+  
+  // Relations
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+// Invitation model - handles pending team invites
+model Invitation {
+  id        Int      @id @default(autoincrement())
+  email     String
+  projectId Int
+  role      String   @default("Viewer") // "Admin" | "Member" | "Viewer"
+  token     String   @unique
+  status    String   @default("pending") // "pending" | "accepted" | "expired"
+  invitedBy Int
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  
+  // Relations
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter   User     @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([email])
+  @@index([projectId])
+}
+
 model Task {
   id           Int           @id @default(autoincrement())
   title        String
   description  String?
   assignedUser String
-  dueDate      String
+  dueDate      String?
   status       String        @default("todo") // "todo" | "inprogress" | "done"
   priority     String        @default("medium") // "low" | "medium" | "high"
+  projectId    Int?          // Optional link to a project
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   activityLogs ActivityLog[]
