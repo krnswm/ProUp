@@ -255,19 +255,26 @@ export default function Projects() {
                   <div className="border-t border-border mb-4 sm:mb-5"></div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-3">
+                  <div className="flex gap-2 sm:gap-3">
                     <Link
                       to={`/project/${project.id}`}
                       className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2 sm:py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity text-sm group"
                     >
-                      <span>View Project</span>
+                      <span>View</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                     <button
                       onClick={() => handleEditClick(project)}
-                      className="flex-1 px-3 py-2 sm:py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-muted transition-colors border border-border text-sm"
+                      className="flex-1 px-2 sm:px-3 py-2 sm:py-2.5 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-muted transition-colors border border-border text-sm"
                     >
                       Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProject(project.id)}
+                      className="px-2 sm:px-3 py-2 sm:py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition-colors border border-red-200 text-sm flex items-center justify-center"
+                      title="Delete project"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
