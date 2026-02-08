@@ -55,7 +55,7 @@ export const createDocument: RequestHandler = async (req, res) => {
   try {
     const { projectId, name, type } = req.body;
     const authReq = req as AuthRequest;
-    const userId = parseInt(authReq.userId || '0');
+    const userId = authReq.user?.id || 0;
 
     if (!projectId || !name || !type) {
       return res.status(400).json({ error: 'Project ID, name, and type are required' });
