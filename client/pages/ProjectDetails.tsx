@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid } from "lucide-react";
+import { useParams, Link } from "react-router-dom";
+import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool } from "lucide-react";
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
@@ -284,6 +284,13 @@ export default function ProjectDetails() {
             <Users className="w-4 h-4" />
             Team
           </button>
+          <Link
+            to={`/project/${projectId}/whiteboard`}
+            className="flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px text-muted-foreground border-transparent hover:text-foreground"
+          >
+            <PenTool className="w-4 h-4" />
+            Whiteboard
+          </Link>
         </div>
 
         {activeTab === "tasks" ? (

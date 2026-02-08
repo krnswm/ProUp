@@ -25,10 +25,24 @@ export const createInvitation = async (
         projectId,
         status: 'pending',
       },
+      include: {
+        project: {
+          select: {
+            name: true,
+          },
+        },
+        inviter: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
+    // If invitation already exists, return it so user can resend/share the link
     if (existingInvitation) {
-      throw new Error('An invitation has already been sent to this email for this project');
+      return existingInvitation;
     }
 
     // Check if user is already a member

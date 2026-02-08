@@ -94,8 +94,9 @@ export default function ProjectMembersTab({
       throw new Error(error.message || "Failed to send invitation");
     }
 
-    // Show success message
-    alert("Invitation sent successfully!");
+    const data = await response.json();
+    // Return the invitation data including the token for the modal to display
+    return data.invitation;
   };
 
   const handleRemoveMember = async (memberId: number, memberName: string) => {

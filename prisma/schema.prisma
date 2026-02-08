@@ -39,8 +39,23 @@ model Project {
   tasks       Task[]
   members     ProjectMember[]
   invitations Invitation[]
+  whiteboard  Whiteboard?
   
   @@index([ownerId])
+}
+
+// Whiteboard model - stores canvas state for real-time collaboration
+model Whiteboard {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @unique
+  data      String   @default("{}") // JSON string of canvas state
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
 }
 
 // ProjectMember model - many-to-many relationship with roles

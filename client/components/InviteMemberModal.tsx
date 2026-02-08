@@ -1,13 +1,20 @@
 import { useState } from "react";
-import { X, Mail, Shield } from "lucide-react";
+import { X, Mail, Shield, Copy, Check, Link } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+interface InvitationResult {
+  token: string;
+  email: string;
+  role: string;
+  expiresAt: string;
+}
 
 interface InviteMemberModalProps {
   isOpen: boolean;
   projectId: number;
   projectName: string;
   onClose: () => void;
-  onInvite: (email: string, role: string) => Promise<void>;
+  onInvite: (email: string, role: string) => Promise<InvitationResult | void>;
 }
 
 const ROLES = [
@@ -42,6 +49,8 @@ export default function InviteMemberModal({
   const [role, setRole] = useState("Viewer");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [invitationResult, setInvitationResult] = useState<InvitationResult | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,14 +58,45 @@ export default function InviteMemberModal({
     setIsLoading(true);
 
     try {
-      await onInvite(email, role);
-      setEmail("");
-      setRole("Viewer");
-      onClose();
+      const result = await onInvite(email, role);
+      if (result && result.token) {
+        setInvitationResult(result);
+      } else {
+        // If no result, just close (backward compatibility)
+        setEmail("");
+        setRole("Viewer");
+        onClose();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to send invitation");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setEmail("");
+    setRole("Viewer");
+    setError("");
+    setInvitationResult(null);
+    setCopied(false);
+    onClose();
+  };
+
+  const getInvitationLink = () => {
+    if (!invitationResult?.token) return "";
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/join-project/${invitationResult.token}`;
+  };
+
+  const copyToClipboard = async () => {
+    const link = getInvitationLink();
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -71,7 +111,7 @@ export default function InviteMemberModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={handleClose}
         />
 
         {/* Modal */}
@@ -86,26 +126,101 @@ export default function InviteMemberModal({
           <div className="relative px-6 py-5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-xl">
-                <Mail className="w-5 h-5 text-primary" />
+                {invitationResult ? (
+                  <Link className="w-5 h-5 text-primary" />
+                ) : (
+                  <Mail className="w-5 h-5 text-primary" />
+                )}
               </div>
               <div>
                 <h2 className="text-xl font-bold text-foreground">
-                  Invite Team Member
+                  {invitationResult ? "Invitation Created!" : "Invite Team Member"}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  to {projectName}
+                  {invitationResult ? "Share this link with your team member" : `to ${projectName}`}
                 </p>
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="absolute top-5 right-5 p-2 hover:bg-secondary rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
 
-          {/* Content */}
+          {/* Success State - Show Invitation Link */}
+          {invitationResult ? (
+            <div className="p-6 space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="text-muted-foreground mb-2">
+                  Invitation sent to <strong className="text-foreground">{invitationResult.email}</strong>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Role: <span className="font-medium">{invitationResult.role}</span>
+                </p>
+              </div>
+
+              {/* Invitation Link */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Share this invitation link:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={getInvitationLink()}
+                    readOnly
+                    className="flex-1 px-4 py-2.5 border border-border rounded-xl bg-input/50 backdrop-blur-sm text-foreground text-sm font-mono focus:outline-none"
+                  />
+                  <motion.button
+                    type="button"
+                    onClick={copyToClipboard}
+                    className={`px-4 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                      copied
+                        ? "bg-green-100 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800"
+                        : "bg-primary text-primary-foreground"
+                    }`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  The invitation will expire in 7 days. The recipient must have an account with the email <strong>{invitationResult.email}</strong> to accept.
+                </p>
+              </div>
+
+              {/* Done Button */}
+              <motion.button
+                type="button"
+                onClick={handleClose}
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-primary to-blue-600 text-primary-foreground rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Done
+              </motion.button>
+            </div>
+          ) : (
+          /* Form Content */
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {/* Error Message */}
             {error && (
@@ -180,7 +295,7 @@ export default function InviteMemberModal({
             <div className="flex gap-3 pt-4">
               <motion.button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 px-4 py-2.5 bg-secondary/80 backdrop-blur-sm text-secondary-foreground rounded-xl font-medium hover:bg-secondary transition-all border border-border/50 shadow-sm"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -201,6 +316,7 @@ export default function InviteMemberModal({
               </motion.button>
             </div>
           </form>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

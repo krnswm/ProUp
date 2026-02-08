@@ -318,6 +318,7 @@ export const inviteMember: RequestHandler = async (req: AuthRequest, res) => {
         role: invitation.role,
         status: invitation.status,
         expiresAt: invitation.expiresAt,
+        token: invitation.token,
       },
     });
   } catch (error: any) {

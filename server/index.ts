@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { createServer as createHttpServer } from 'http';
 import { authenticate } from "./middleware/authenticate";
 import { handleDemo } from "./routes/demo";
 import { getTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
@@ -22,6 +23,8 @@ import {
 } from "./routes/projects";
 import { getDashboardAnalytics } from "./routes/dashboard";
 import { register, login, getCurrentUser, logout, getAllUsers } from "./routes/auth";
+import { getWhiteboard, saveWhiteboard } from "./routes/whiteboard";
+import { setupSocketServer } from "./socket";
 
 export function createServer() {
   const app = express();
@@ -86,5 +89,18 @@ export function createServer() {
   app.post("/api/projects/join/:token", joinProject);
   app.delete("/api/projects/:id/invitations/:invitationId", cancelInvitation);
 
+  // Whiteboard routes
+  app.get("/api/whiteboard/:projectId", getWhiteboard);
+  app.post("/api/whiteboard/:projectId", saveWhiteboard);
+
   return app;
+}
+
+// Create HTTP server with Socket.io support
+export function createServerWithSocket() {
+  const app = createServer();
+  const httpServer = createHttpServer(app);
+  const io = setupSocketServer(httpServer);
+  
+  return { app, httpServer, io };
 }
