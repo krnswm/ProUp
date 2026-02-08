@@ -16,6 +16,8 @@ import ProjectDetails from "./pages/ProjectDetails";
 import Calendar from "./pages/Calendar";
 import JoinProject from "./pages/JoinProject";
 import Whiteboard from "./pages/Whiteboard";
+import DocumentEditor from "./pages/DocumentEditor";
+import SpreadsheetEditor from "./pages/SpreadsheetEditor";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -76,6 +78,22 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Whiteboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project/:projectId/document/:documentId"
+              element={
+                <ProtectedRoute>
+                  <DocumentEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project/:projectId/spreadsheet/:documentId"
+              element={
+                <ProtectedRoute>
+                  <SpreadsheetEditor />
                 </ProtectedRoute>
               }
             />

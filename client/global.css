@@ -12,93 +12,103 @@
    * tailwind.config.ts expects HSL values in this format
   */
   :root {
-    /* Background & Text */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 15%;
+    /* Premium Light Theme - Modern & Sophisticated */
+    --background: 220 20% 98%;
+    --foreground: 222 47% 11%;
 
-    /* Card Surfaces */
+    /* Card Surfaces - Soft Elevated */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 15%;
+    --card-foreground: 222 47% 11%;
 
-    /* Popover */
+    /* Popover - Clean White */
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 15%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Primary: Professional Blue */
-    --primary: 217 91% 60%;
+    /* Primary: Vibrant Purple-Blue */
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Light Gray */
-    --secondary: 0 0% 94%;
-    --secondary-foreground: 0 0% 15%;
+    /* Secondary: Soft Purple Tint */
+    --secondary: 260 15% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    /* Muted: Subtle Gray */
-    --muted: 0 0% 88%;
-    --muted-foreground: 0 0% 45%;
+    /* Muted: Subtle Gray-Purple */
+    --muted: 260 20% 94%;
+    --muted-foreground: 220 9% 46%;
 
-    /* Accent: Matching primary for consistency */
-    --accent: 217 91% 60%;
+    /* Accent: Electric Purple */
+    --accent: 270 90% 65%;
     --accent-foreground: 0 0% 100%;
 
-    /* Destructive: Red */
+    /* Destructive: Modern Coral Red */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Border & Input */
-    --border: 0 0% 90%;
-    --input: 0 0% 97%;
-    --ring: 217 91% 60%;
+    /* Border & Input - Elegant */
+    --border: 220 13% 91%;
+    --input: 220 15% 97%;
+    --ring: 262 83% 58%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    /* Sidebar */
-    --sidebar-background: 0 0% 96%;
-    --sidebar-foreground: 0 0% 15%;
-    --sidebar-primary: 217 91% 60%;
+    /* Sleek Sidebar - Premium Dark */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 88%;
-    --sidebar-accent-foreground: 0 0% 15%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 220 20% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 220 20% 25%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
-    --background: 0 0% 8%;
-    --foreground: 0 0% 95%;
+    /* Premium Dark Theme - Sleek & Modern */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 95%;
+    /* Card Surfaces - Rich Dark */
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 95%;
+    /* Popover */
+    --popover: 240 10% 7%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 217 91% 60%;
+    /* Primary: Vibrant Purple-Blue */
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 95%;
+    /* Secondary: Deep Gray */
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 28%;
-    --muted-foreground: 0 0% 65%;
+    /* Muted: Rich Gray */
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
-    --accent: 217 91% 60%;
+    /* Accent: Electric Purple */
+    --accent: 262 83% 58%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    /* Destructive: Modern Red */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 16%;
-    --ring: 217 91% 60%;
+    /* Border & Input - Subtle */
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 12%;
+    --ring: 262 83% 58%;
 
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 217 91% 60%;
+    /* Premium Sidebar */
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 20%;
-    --sidebar-accent-foreground: 0 0% 90%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 262 83% 58%;
   }
 }
 
@@ -125,15 +135,35 @@
 }
 
 @layer components {
+  /* Modern Button Styles */
   .btn-primary {
-    @apply px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity;
+    @apply px-4 py-2 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-muted transition-colors border border-border;
+    @apply px-4 py-2 bg-secondary text-secondary-foreground rounded-xl font-medium hover:bg-muted transition-all duration-200 border border-border shadow-sm hover:shadow-md;
   }
 
+  /* Premium Card Styles */
   .card-shadow {
-    @apply shadow-sm border border-border;
+    @apply shadow-lg border border-border/50 backdrop-blur-sm;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:scale-[1.01] hover:border-primary/20;
+  }
+  
+  /* Modern Input Styles */
+  .input-modern {
+    @apply rounded-xl border-border bg-input transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20;
+  }
+  
+  /* Gradient Backgrounds */
+  .bg-gradient-primary {
+    @apply bg-gradient-to-br from-primary to-accent;
+  }
+  
+  .bg-gradient-card {
+    @apply bg-gradient-to-br from-card via-card to-secondary/20;
   }
 }

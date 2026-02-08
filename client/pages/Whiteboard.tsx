@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Tldraw, Editor, TLStoreSnapshot } from "tldraw";
+import { Tldraw, Editor, TLStoreSnapshot, getSnapshot, loadSnapshot } from "tldraw";
 import "tldraw/tldraw.css";
 import { motion } from "framer-motion";
 import { ArrowLeft, Save, Users, Wifi, WifiOff, Loader2 } from "lucide-react";
@@ -99,7 +99,7 @@ export default function Whiteboard() {
     // Load initial data if available
     if (initialData) {
       try {
-        editor.store.loadSnapshot(initialData as TLStoreSnapshot);
+        loadSnapshot(editor.store, initialData);
       } catch (error) {
         console.error("Error loading snapshot:", error);
       }
@@ -125,26 +125,39 @@ export default function Whiteboard() {
   }, [initialData, emitCanvasChange, emitCursorMove]);
 
   // Save whiteboard
-  const handleSave = async () => {
-    if (!editorRef.current || !projectId) return;
+  const handleSave = useCallback(async () => {
+    if (!editorRef.current || !projectId) {
+      console.log("Cannot save: missing editor or projectId");
+      return;
+    }
     
     setIsSaving(true);
     try {
-      const snapshot = editorRef.current.store.getSnapshot();
+      // Use tldraw v4 getSnapshot function
+      const { document, session } = getSnapshot(editorRef.current.store);
+      console.log("Saving whiteboard snapshot for project:", projectId);
+      
       const response = await api(`/api/whiteboard/${projectId}`, {
         method: "POST",
-        body: JSON.stringify({ data: JSON.stringify(snapshot) }),
+        body: JSON.stringify({ data: { document, session } }),
       });
       
       if (response.ok) {
+        const result = await response.json();
+        console.log("Whiteboard saved successfully:", result);
         setLastSaved(new Date());
+      } else {
+        const error = await response.text();
+        console.error("Failed to save whiteboard. Status:", response.status, "Error:", error);
+        alert(`Failed to save whiteboard: ${response.status} - ${error}`);
       }
     } catch (error) {
       console.error("Error saving whiteboard:", error);
+      alert(`Error saving whiteboard: ${error}`);
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [projectId]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -155,7 +168,7 @@ export default function Whiteboard() {
     }, 30000);
 
     return () => clearInterval(autoSaveInterval);
-  }, [projectId]);
+  }, [handleSave]);
 
   if (isLoading) {
     return (

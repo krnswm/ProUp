@@ -24,6 +24,7 @@ import {
 import { getDashboardAnalytics } from "./routes/dashboard";
 import { register, login, getCurrentUser, logout, getAllUsers } from "./routes/auth";
 import { getWhiteboard, saveWhiteboard } from "./routes/whiteboard";
+import { getDocuments, getDocument, createDocument, updateDocument, deleteDocument } from "./routes/documents";
 import { setupSocketServer } from "./socket";
 
 export function createServer() {
@@ -92,6 +93,13 @@ export function createServer() {
   // Whiteboard routes
   app.get("/api/whiteboard/:projectId", getWhiteboard);
   app.post("/api/whiteboard/:projectId", saveWhiteboard);
+
+  // Document routes
+  app.get("/api/documents/:projectId", getDocuments);
+  app.get("/api/documents/file/:documentId", getDocument);
+  app.post("/api/documents", createDocument);
+  app.put("/api/documents/:documentId", updateDocument);
+  app.delete("/api/documents/:documentId", deleteDocument);
 
   return app;
 }

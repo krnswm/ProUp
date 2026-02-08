@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool } from "lucide-react";
+import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
 import TaskModal from "@/components/TaskModal";
 import ActivityLogModal from "@/components/ActivityLogModal";
 import ProjectMembersTab from "@/components/ProjectMembersTab";
+import DocumentsList from "@/components/DocumentsList";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -27,7 +28,7 @@ export default function ProjectDetails() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [historyTask, setHistoryTask] = useState<Task | undefined>();
-  const [activeTab, setActiveTab] = useState<"tasks" | "team">("tasks");
+  const [activeTab, setActiveTab] = useState<"tasks" | "team" | "documents">("tasks");
 
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -284,6 +285,17 @@ export default function ProjectDetails() {
             <Users className="w-4 h-4" />
             Team
           </button>
+          <button
+            onClick={() => setActiveTab("documents")}
+            className={`flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px ${
+              activeTab === "documents"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Documents
+          </button>
           <Link
             to={`/project/${projectId}/whiteboard`}
             className="flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px text-muted-foreground border-transparent hover:text-foreground"
@@ -401,7 +413,7 @@ export default function ProjectDetails() {
           <KanbanColumn title="Done" tasks={getDoneTasks()} status="done" />
         </div>
           </>
-        ) : (
+        ) : activeTab === "team" ? (
           /* Team Tab */
           <div className="bg-card rounded-2xl p-6 shadow-lg border border-border">
             {project && (
@@ -411,6 +423,11 @@ export default function ProjectDetails() {
                 currentUserRole={currentUserRole}
               />
             )}
+          </div>
+        ) : (
+          /* Documents Tab */
+          <div className="bg-card rounded-2xl p-6 shadow-lg border border-border">
+            {project && <DocumentsList projectId={project.id} />}
           </div>
         )}
       </div>

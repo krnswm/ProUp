@@ -1,0 +1,137 @@
+/* TipTap Editor Styles */
+.ProseMirror {
+  min-height: 700px;
+  padding: 2rem;
+  outline: none;
+  color: inherit;
+}
+
+.ProseMirror p {
+  margin: 0.75em 0;
+  color: inherit;
+}
+
+.ProseMirror h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 0.67em 0;
+  color: inherit;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.75em 0;
+  color: inherit;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 0.83em 0;
+  color: inherit;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 2rem;
+  margin: 0.75em 0;
+  color: inherit;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.ProseMirror li {
+  margin: 0.5em 0;
+  padding-left: 0.25em;
+  color: inherit;
+}
+
+.ProseMirror li > p {
+  margin: 0.25em 0;
+}
+
+.ProseMirror ul ul {
+  list-style-type: circle;
+  margin-top: 0.25em;
+}
+
+.ProseMirror ol ol {
+  list-style-type: lower-alpha;
+  margin-top: 0.25em;
+}
+
+.ProseMirror strong {
+  font-weight: bold;
+  color: inherit;
+}
+
+.ProseMirror em {
+  font-style: italic;
+  color: inherit;
+}
+
+.ProseMirror code {
+  background-color: hsl(var(--muted));
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+
+/* Dark mode support */
+.dark .ProseMirror {
+  color: hsl(var(--foreground));
+}
+
+.dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Spreadsheet Grid Styles */
+.reactgrid {
+  font-family: inherit;
+}
+
+.reactgrid-cell {
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.reactgrid-cell.header {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+  text-align: center;
+}
+
+.reactgrid-cell:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+}
+
+/* Dark mode adjustments */
+.dark .reactgrid {
+  background-color: hsl(var(--background));
+}
+
+.dark .reactgrid-cell {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
