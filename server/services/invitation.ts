@@ -1,5 +1,9 @@
 import { prisma } from '../prisma';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
  * Generate a unique invitation token
@@ -275,8 +279,7 @@ export const cancelInvitation = async (invitationId: number) => {
 };
 
 /**
- * Mock function to send invitation email
- * In production, this would integrate with an email service like SendGrid, AWS SES, etc.
+ * Send invitation email via Gmail SMTP
  */
 export const sendInvitationEmail = async (
   invitation: {
@@ -286,29 +289,88 @@ export const sendInvitationEmail = async (
     inviter: { name: string };
   }
 ) => {
-  // Mock email sending
-  console.log('====================================');
-  console.log('📧 MOCK EMAIL SENT');
-  console.log('====================================');
-  console.log(`To: ${invitation.email}`);
-  console.log(`Subject: You've been invited to join ${invitation.project.name}`);
-  console.log('');
-  console.log(`Hi there!`);
-  console.log('');
-  console.log(`${invitation.inviter.name} has invited you to collaborate on the project "${invitation.project.name}".`);
-  console.log('');
-  console.log(`Click the link below to accept the invitation:`);
-  console.log(`http://localhost:8080/join-project/${invitation.token}`);
-  console.log('');
-  console.log(`This invitation will expire in 7 days.`);
-  console.log('====================================');
+  try {
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPassword = process.env.GMAIL_PASSWORD;
 
-  // In production, you would use an email service:
-  // await emailService.send({
-  //   to: invitation.email,
-  //   subject: `You've been invited to join ${invitation.project.name}`,
-  //   html: generateInvitationEmailTemplate(invitation),
-  // });
+    if (!gmailUser || !gmailPassword) {
+      console.error('Gmail credentials not configured in environment variables');
+      console.log('====================================');
+      console.log('📧 MOCK EMAIL SENT (Gmail not configured)');
+      console.log('====================================');
+      console.log(`To: ${invitation.email}`);
+      console.log(`Subject: You've been invited to join ${invitation.project.name}`);
+      console.log(`Join link: http://localhost:8080/join-project/${invitation.token}`);
+      console.log('====================================');
+      return false;
+    }
 
-  return true;
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailPassword,
+      },
+    });
+
+    // Email template
+    const invitationLink = `http://localhost:8080/join-project/${invitation.token}`;
+    
+    const htmlTemplate = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">You've been invited to join a project!</h2>
+        
+        <p style="color: #666; font-size: 14px;">Hi there,</p>
+        
+        <p style="color: #666; font-size: 14px;">
+          <strong>${invitation.inviter.name}</strong> has invited you to collaborate on the project <strong>"${invitation.project.name}"</strong>.
+        </p>
+        
+        <p style="margin: 30px 0;">
+          <a href="${invitationLink}" style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Accept Invitation
+          </a>
+        </p>
+        
+        <p style="color: #666; font-size: 14px;">
+          Or copy and paste this link in your browser:<br>
+          <code style="background-color: #f5f5f5; padding: 10px; display: inline-block; margin-top: 10px;">${invitationLink}</code>
+        </p>
+        
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+          This invitation will expire in 7 days.
+        </p>
+        
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px;">
+          If you did not expect this invitation, you can safely ignore this email.
+        </p>
+      </div>
+    `;
+
+    // Send email
+    const mailOptions = {
+      from: gmailUser,
+      to: invitation.email,
+      subject: `You've been invited to join ${invitation.project.name}`,
+      html: htmlTemplate,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log('====================================');
+    console.log('📧 EMAIL SENT SUCCESSFULLY');
+    console.log('====================================');
+    console.log(`To: ${invitation.email}`);
+    console.log(`Subject: You've been invited to join ${invitation.project.name}`);
+    console.log(`From: ${gmailUser}`);
+    console.log('====================================');
+
+    return true;
+  } catch (error) {
+    console.error('Error sending invitation email:', error);
+    // Don't throw - allow the invitation to be created even if email fails
+    return false;
+  }
 };
