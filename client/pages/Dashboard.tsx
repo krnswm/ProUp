@@ -59,6 +59,10 @@ export default function Dashboard() {
     ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
     : 0;
 
+  const productivityIndex = stats.totalTasks > 0
+    ? Math.round(((stats.completedTasks + stats.inProgressTasks) / stats.totalTasks) * 100)
+    : 0;
+
   const summaryCards = [
     {
       title: "Total Projects",
@@ -318,11 +322,11 @@ export default function Dashboard() {
                   <div className="flex-1 h-1.5 sm:h-2 bg-secondary rounded-full overflow-hidden min-w-0">
                     <div
                       className="h-full bg-primary rounded-full"
-                      style={{ width: "72%" }}
+                      style={{ width: `${productivityIndex}%` }}
                     />
                   </div>
                   <span className="text-xs sm:text-sm font-bold text-foreground flex-shrink-0">
-                    72%
+                    {productivityIndex}%
                   </span>
                 </div>
               </div>
