@@ -22,7 +22,7 @@ import {
   cancelInvitation,
 } from "./routes/projects";
 import { getDashboardAnalytics } from "./routes/dashboard";
-import { register, login, getCurrentUser, logout, getAllUsers } from "./routes/auth";
+import { register, login, forgotPassword, resetPassword, getCurrentUser, logout, getAllUsers } from "./routes/auth";
 import { getWhiteboard, saveWhiteboard } from "./routes/whiteboard";
 import { getDocuments, getDocument, createDocument, updateDocument, deleteDocument } from "./routes/documents";
 import { setupSocketServer } from "./socket";
@@ -46,6 +46,8 @@ export function createServer() {
   // Auth routes (public - must be before authentication middleware)
   app.post("/api/auth/register", register);
   app.post("/api/auth/login", login);
+  app.post("/api/auth/forgot-password", forgotPassword);
+  app.post("/api/auth/reset-password", resetPassword);
   app.get("/api/auth/users", getAllUsers);
   
   // Apply authentication middleware to all routes below this point

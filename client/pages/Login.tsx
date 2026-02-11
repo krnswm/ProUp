@@ -185,6 +185,15 @@ export default function Login() {
               />
             </div>
 
+            <div className="text-right">
+              <Link
+                to="/forgot-password"
+                className="text-sm font-medium text-primary hover:opacity-80"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             <motion.button
               type="submit"
               disabled={isLoading}

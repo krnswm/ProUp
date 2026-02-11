@@ -1,4 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prismaPkg from '@prisma/client';
+
+const { PrismaClient } = prismaPkg as unknown as { PrismaClient: typeof import('@prisma/client').PrismaClient };
 
 // Prevent multiple instances of Prisma Client in development
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
