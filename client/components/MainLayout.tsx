@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, LogOut, Moon, Sun } from "lucide-react";
+import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, ListTodo, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +36,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const navItems = [
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { label: "My Tasks", path: "/my-tasks", icon: ListTodo },
     { label: "Projects", path: "/projects", icon: FolderOpen },
     { label: "Calendar", path: "/calendar", icon: CalendarDays },
   ];

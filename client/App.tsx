@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import MyTasks from "./pages/MyTasks";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetails from "./pages/ProjectDetails";
@@ -50,6 +51,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-tasks"
+              element={
+                <ProtectedRoute>
+                  <MyTasks />
                 </ProtectedRoute>
               }
             />

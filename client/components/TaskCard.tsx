@@ -6,20 +6,22 @@ export interface Task {
   title: string;
   description?: string;
   assignedUser: string;
-  dueDate: string;
+  dueDate?: string;
   status: "todo" | "inprogress" | "done";
   priority: "low" | "medium" | "high";
   projectId?: number | null;
+  position?: number;
 }
 
 interface TaskCardProps {
   task: Task;
+  onOpen?: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (taskId: number) => void;
   onHistory: (task: Task) => void;
 }
 
-export default function TaskCard({ task, onEdit, onDelete, onHistory }: TaskCardProps) {
+export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: TaskCardProps) {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case "todo":
@@ -70,6 +72,7 @@ export default function TaskCard({ task, onEdit, onDelete, onHistory }: TaskCard
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      onClick={() => onOpen?.(task)}
     >
       {/* Gradient overlay on hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -89,7 +92,7 @@ export default function TaskCard({ task, onEdit, onDelete, onHistory }: TaskCard
         {/* Due Date */}
         <div className="mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="text-xs text-muted-foreground">{task.dueDate}</span>
+          <span className="text-xs text-muted-foreground">{task.dueDate || "—"}</span>
         </div>
 
         {/* Priority Badge */}
@@ -114,7 +117,10 @@ export default function TaskCard({ task, onEdit, onDelete, onHistory }: TaskCard
           </span>
           <div className="flex gap-1">
             <motion.button
-              onClick={() => onHistory(task)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onHistory(task);
+              }}
               className="p-1.5 hover:bg-primary/10 rounded-lg transition-all"
               title="View history"
               whileHover={{ scale: 1.1 }}
@@ -123,7 +129,10 @@ export default function TaskCard({ task, onEdit, onDelete, onHistory }: TaskCard
               <History className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
             </motion.button>
             <motion.button
-              onClick={() => onEdit(task)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(task);
+              }}
               className="p-1.5 hover:bg-primary/10 rounded-lg transition-all"
               title="Edit task"
               whileHover={{ scale: 1.1 }}
@@ -132,7 +141,10 @@ export default function TaskCard({ task, onEdit, onDelete, onHistory }: TaskCard
               <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
             </motion.button>
             <motion.button
-              onClick={() => onDelete(task.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(task.id);
+              }}
               className="p-1.5 hover:bg-destructive/10 rounded-lg transition-all"
               title="Delete task"
               whileHover={{ scale: 1.1 }}

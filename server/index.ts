@@ -4,7 +4,7 @@ import cors from "cors";
 import { createServer as createHttpServer } from 'http';
 import { authenticate } from "./middleware/authenticate";
 import { handleDemo } from "./routes/demo";
-import { getTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
+import { getTasks, getMyTasks, getProjectBoard, reorderTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
 import { getActivityLogs } from "./routes/activityLogs";
 import { getCalendarTasks, getFilteredCalendarTasks } from "./routes/calendar";
 import { 
@@ -59,10 +59,15 @@ export function createServer() {
 
   // Task routes
   app.get("/api/tasks", getTasks);
+  app.get("/api/tasks/my", getMyTasks);
   app.get("/api/tasks/:id", getTask);
   app.post("/api/tasks", createTask);
+  app.patch("/api/tasks/reorder", reorderTasks);
   app.put("/api/tasks/:id", updateTask);
   app.delete("/api/tasks/:id", deleteTask);
+
+  // Project board routes
+  app.get("/api/projects/:projectId/board", getProjectBoard);
 
   // Activity log routes
   app.get("/api/tasks/:taskId/activity-logs", getActivityLogs);

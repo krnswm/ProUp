@@ -4,7 +4,7 @@ import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenT
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
-import TaskModal from "@/components/TaskModal";
+import TaskDrawer from "@/components/TaskDrawer";
 import ActivityLogModal from "@/components/ActivityLogModal";
 import ProjectMembersTab from "@/components/ProjectMembersTab";
 import DocumentsList from "@/components/DocumentsList";
@@ -22,7 +22,7 @@ interface Project {
 export default function ProjectDetails() {
   const { projectId } = useParams();
   const { user } = useAuth();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -61,14 +61,11 @@ export default function ProjectDetails() {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const response = await api('/api/tasks');
+      if (!projectId) return;
+      const response = await api(`/api/projects/${projectId}/board`);
       if (response.ok) {
         const data = await response.json();
-        // Filter tasks for this project only
-        const projectTasks = projectId 
-          ? data.filter((task: Task) => task.projectId === parseInt(projectId))
-          : data;
-        setTasks(projectTasks);
+        setTasks(data.tasks || []);
       }
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -79,12 +76,17 @@ export default function ProjectDetails() {
 
   const handleAddTask = () => {
     setEditingTask(undefined);
-    setIsModalOpen(true);
+    setIsDrawerOpen(true);
   };
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
-    setIsModalOpen(true);
+    setIsDrawerOpen(true);
+  };
+
+  const handleOpenTask = (task: Task) => {
+    setEditingTask(task);
+    setIsDrawerOpen(true);
   };
 
   const handleViewHistory = (task: Task) => {
@@ -103,7 +105,7 @@ export default function ProjectDetails() {
         
         if (response.ok) {
           const updatedTask = await response.json();
-          setTasks(tasks.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+          setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updatedTask : t)));
         }
       } else {
         // Create new task with projectId
@@ -114,7 +116,7 @@ export default function ProjectDetails() {
         
         if (response.ok) {
           const createdTask = await response.json();
-          setTasks([...tasks, createdTask]);
+          setTasks((prev) => [...prev, createdTask]);
         }
       }
     } catch (error) {
@@ -239,6 +241,7 @@ export default function ProjectDetails() {
           >
             <TaskCard
               task={task}
+              onOpen={handleOpenTask}
               onEdit={handleEditTask}
               onDelete={handleDeleteTask}
               onHistory={handleViewHistory}
@@ -433,14 +436,14 @@ export default function ProjectDetails() {
       </div>
 
       {/* Task Modal */}
-      <TaskModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingTask(undefined);
+      <TaskDrawer
+        open={isDrawerOpen}
+        onOpenChange={(open) => {
+          setIsDrawerOpen(open);
+          if (!open) setEditingTask(undefined);
         }}
         onSave={handleSaveTask}
-        initialTask={editingTask}
+        task={editingTask}
       />
 
       {/* Activity Log Modal */}

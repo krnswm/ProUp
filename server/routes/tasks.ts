@@ -3,6 +3,18 @@ import { prisma } from '../prisma';
 import { logTaskChanges, logTaskCreation } from '../services/activityLog';
 import { AuthRequest } from '../middleware/authorize';
 
+type TaskStatus = 'todo' | 'inprogress' | 'done';
+
+const parseStatus = (value: unknown): TaskStatus | null => {
+  if (value === 'todo' || value === 'inprogress' || value === 'done') return value;
+  return null;
+};
+
+const isUnknownPositionError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('Unknown argument `position`') || message.includes('Unknown argument \'position\'');
+};
+
 // GET /api/tasks - Get tasks for the authenticated user's projects
 export const getTasks: RequestHandler = async (req: AuthRequest, res) => {
   try {
@@ -13,13 +25,15 @@ export const getTasks: RequestHandler = async (req: AuthRequest, res) => {
     }
 
     // Get tasks from projects where user is owner or member
-    const tasks = await prisma.task.findMany({
+    const query = {
       where: {
         project: {
-          OR: [
-            { ownerId: userId },
-            { members: { some: { userId: userId } } },
-          ],
+          is: {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId: userId } } },
+            ],
+          },
         },
       },
       include: {
@@ -27,12 +41,148 @@ export const getTasks: RequestHandler = async (req: AuthRequest, res) => {
           select: { id: true, name: true, color: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    } as const;
+
+    let tasks;
+    try {
+      tasks = await prisma.task.findMany({
+        ...query,
+        orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'desc' }],
+      } as any);
+    } catch (error) {
+      if (!isUnknownPositionError(error)) throw error;
+      tasks = await prisma.task.findMany({
+        ...query,
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      } as any);
+    }
     res.json(tasks);
   } catch (error) {
     console.error('Error fetching tasks:', error);
     res.status(500).json({ error: 'Failed to fetch tasks' });
+  }
+};
+
+// GET /api/tasks/my - Get tasks assigned to the current user (across their projects)
+export const getMyTasks: RequestHandler = async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    const userName = req.user?.name;
+    const userEmail = req.user?.email;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    if (!userName) {
+      return res.status(400).json({ error: 'User profile incomplete' });
+    }
+
+    const query = {
+      where: {
+        project: {
+          is: {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId: userId } } },
+            ],
+          },
+        },
+      },
+      include: {
+        project: {
+          select: { id: true, name: true, color: true },
+        },
+      },
+    } as const;
+
+    let tasks;
+    try {
+      tasks = await prisma.task.findMany({
+        ...query,
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { position: 'asc' }, { createdAt: 'desc' }],
+      } as any);
+    } catch (error) {
+      if (!isUnknownPositionError(error)) throw error;
+      tasks = await prisma.task.findMany({
+        ...query,
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+      } as any);
+    }
+
+    const normalize = (value: unknown) =>
+      String(value ?? '')
+        .trim()
+        .toLowerCase();
+
+    const meName = normalize(userName);
+    const meEmail = normalize(userEmail);
+
+    const myTasks = (tasks as any[]).filter((t) => {
+      const assignee = normalize(t.assignedUser);
+      if (!assignee) return false;
+      if (assignee === meName) return true;
+      if (meEmail && assignee === meEmail) return true;
+      return false;
+    });
+
+    res.json(myTasks);
+  } catch (error) {
+    console.error('Error fetching my tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch my tasks' });
+  }
+};
+
+// GET /api/projects/:projectId/board - Get a Kanban board view for a project
+export const getProjectBoard: RequestHandler = async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const projectIdRaw = (req.params as unknown as { projectId?: string | string[] }).projectId;
+    const projectIdValue = Array.isArray(projectIdRaw) ? projectIdRaw[0] : projectIdRaw;
+    const projectIdInt = parseInt(projectIdValue || '');
+
+    if (Number.isNaN(projectIdInt)) {
+      return res.status(400).json({ error: 'Invalid projectId' });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectIdInt,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId: userId } } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    let tasks;
+    try {
+      tasks = await prisma.task.findMany({
+        where: { project: { is: { id: projectIdInt } } },
+        orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
+      } as any);
+    } catch (error) {
+      if (!isUnknownPositionError(error)) throw error;
+      tasks = await prisma.task.findMany({
+        where: { project: { is: { id: projectIdInt } } },
+        orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+      } as any);
+    }
+
+    res.json({ projectId: projectIdInt, tasks });
+  } catch (error) {
+    console.error('Error fetching project board:', error);
+    res.status(500).json({ error: 'Failed to fetch project board' });
   }
 };
 
@@ -62,18 +212,55 @@ export const createTask: RequestHandler = async (req: AuthRequest, res) => {
     const { title, description, assignedUser, dueDate, status, priority, projectId } = req.body;
     const userId = req.user?.id?.toString() || 'system';
 
+    const statusValue = parseStatus(status) ?? 'todo';
+    const projectIdValue: number | null = projectId ? parseInt(projectId) : null;
+
+    let nextPosition = 0;
+    try {
+      const last = await prisma.task.findFirst({
+        where: {
+          project: projectIdValue ? { is: { id: projectIdValue } } : undefined,
+          status: statusValue,
+        },
+        orderBy: { position: 'desc' },
+        select: { position: true },
+      } as any);
+
+      nextPosition = (last?.position ?? 0) + 1;
+    } catch (error) {
+      if (!isUnknownPositionError(error)) throw error;
+      nextPosition = 0;
+    }
+
     // Create the task
-    const task = await prisma.task.create({
-      data: {
-        title,
-        description,
-        assignedUser,
-        dueDate,
-        status: status || 'todo',
-        priority: priority || 'medium',
-        projectId: projectId || null,
-      },
-    });
+    let task;
+    try {
+      task = await prisma.task.create({
+        data: {
+          title,
+          description,
+          assignedUser,
+          dueDate,
+          status: statusValue,
+          priority: priority || 'medium',
+          project: projectIdValue ? { connect: { id: projectIdValue } } : undefined,
+          position: nextPosition,
+        },
+      } as any);
+    } catch (error) {
+      if (!isUnknownPositionError(error)) throw error;
+      task = await prisma.task.create({
+        data: {
+          title,
+          description,
+          assignedUser,
+          dueDate,
+          status: statusValue,
+          priority: priority || 'medium',
+          project: projectIdValue ? { connect: { id: projectIdValue } } : undefined,
+        },
+      } as any);
+    }
 
     // Log task creation
     await logTaskCreation(task.id, task, userId);
@@ -90,16 +277,48 @@ export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const taskId = Array.isArray(id) ? id[0] : id;
-    const { title, description, assignedUser, dueDate, status, priority, projectId } = req.body;
+    const { title, description, assignedUser, dueDate, status, priority, projectId, position } = req.body;
     const userId = req.user?.id?.toString() || 'system';
 
     // Fetch old task data
     const oldTask = await prisma.task.findUnique({
       where: { id: parseInt(taskId) },
+      include: { project: { select: { id: true } } },
     });
 
     if (!oldTask) {
       return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const newStatus = status ? parseStatus(status) : null;
+    const isStatusChanged = newStatus !== null && newStatus !== oldTask.status;
+
+    const projectIdValue: number | null = projectId === null ? null : projectId !== undefined ? parseInt(projectId) : undefined;
+    const isProjectChanged = projectIdValue !== undefined;
+
+    const oldProjectId = oldTask.project?.id ?? null;
+    const targetProjectId = isProjectChanged ? projectIdValue : oldProjectId;
+
+    let nextPosition: number | undefined = undefined;
+    if (typeof position === 'number') {
+      nextPosition = position;
+    } else if (isStatusChanged) {
+      try {
+        const last = await prisma.task.findFirst({
+          where: {
+            project: targetProjectId ? { is: { id: targetProjectId } } : undefined,
+            status: newStatus as TaskStatus,
+          },
+          orderBy: { position: 'desc' },
+          select: { position: true },
+        } as any);
+        nextPosition = (last?.position ?? 0) + 1;
+      } catch (error) {
+        // If the schema/client doesn't support project relation filters or position ordering yet,
+        // don't block status updates.
+        console.error('Skipping position calculation due to error:', error);
+        nextPosition = undefined;
+      }
     }
 
     // Update the task
@@ -110,9 +329,15 @@ export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
         description,
         assignedUser,
         dueDate,
-        status,
+        status: newStatus ?? undefined,
         priority,
-        projectId: projectId !== undefined ? projectId : undefined,
+        project:
+          projectIdValue === undefined
+            ? undefined
+            : projectIdValue === null
+              ? { disconnect: true }
+              : { connect: { id: projectIdValue } },
+        position: nextPosition,
       },
     });
 
@@ -138,6 +363,42 @@ export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });
+  }
+};
+
+// PATCH /api/tasks/reorder - Bulk update task ordering and/or status
+export const reorderTasks: RequestHandler = async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { moves } = req.body as {
+      moves?: Array<{ id: number; status?: TaskStatus; position: number }>;
+    };
+
+    if (!Array.isArray(moves) || moves.length === 0) {
+      return res.status(400).json({ error: 'moves is required' });
+    }
+
+    await prisma.$transaction(
+      moves.map((m) =>
+        prisma.task.update({
+          where: { id: m.id },
+          data: {
+            status: m.status,
+            position: m.position,
+          },
+        })
+      )
+    );
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error reordering tasks:', error);
+    res.status(500).json({ error: 'Failed to reorder tasks' });
   }
 };
 
