@@ -15,6 +15,66 @@ const isUnknownPositionError = (error: unknown) => {
   return message.includes('Unknown argument `position`') || message.includes('Unknown argument \'position\'');
 };
 
+const normalize = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase();
+
+const resolveUserFromAssignee = async (assignedUser: unknown) => {
+  const raw = String(assignedUser ?? '').trim();
+  if (!raw) return null;
+
+  // Prefer exact email match, fallback to name (case-insensitive)
+  const maybeEmail = raw.includes('@') ? raw : null;
+
+  // NOTE: SQLite does not support Prisma's `mode: 'insensitive'` string filter.
+  // Keep the query strict, then fall back to an in-memory case-insensitive match.
+  const strictUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(maybeEmail ? [{ email: maybeEmail }] : []),
+        { name: raw },
+      ],
+    },
+    select: { id: true, email: true, name: true },
+  });
+
+  if (strictUser) return strictUser;
+
+  if (!maybeEmail) {
+    const normalized = normalize(raw);
+    const users = await prisma.user.findMany({
+      select: { id: true, email: true, name: true },
+    });
+    const found = users.find((u) => normalize(u.name) === normalized);
+    return found ?? null;
+  }
+
+  return null;
+};
+
+const createNotificationSafe = async (input: {
+  userId: number;
+  type: string;
+  title: string;
+  body?: string | null;
+  link?: string | null;
+}) => {
+  try {
+    await prisma.notification.create({
+      data: {
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body ?? null,
+        link: input.link ?? null,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to create notification:', error);
+  }
+};
+
 // GET /api/tasks - Get tasks for the authenticated user's projects
 export const getTasks: RequestHandler = async (req: AuthRequest, res) => {
   try {
@@ -110,11 +170,6 @@ export const getMyTasks: RequestHandler = async (req: AuthRequest, res) => {
       } as any);
     }
 
-    const normalize = (value: unknown) =>
-      String(value ?? '')
-        .trim()
-        .toLowerCase();
-
     const meName = normalize(userName);
     const meEmail = normalize(userEmail);
 
@@ -129,7 +184,8 @@ export const getMyTasks: RequestHandler = async (req: AuthRequest, res) => {
     res.json(myTasks);
   } catch (error) {
     console.error('Error fetching my tasks:', error);
-    res.status(500).json({ error: 'Failed to fetch my tasks' });
+    const details = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: 'Failed to fetch my tasks', details });
   }
 };
 
@@ -265,10 +321,23 @@ export const createTask: RequestHandler = async (req: AuthRequest, res) => {
     // Log task creation
     await logTaskCreation(task.id, task, userId);
 
+    // Notification: if assignedUser matches a user, notify them
+    const assignedTo = await resolveUserFromAssignee(assignedUser);
+    if (assignedTo) {
+      await createNotificationSafe({
+        userId: assignedTo.id,
+        type: 'TASK_ASSIGNED',
+        title: 'New task assigned',
+        body: title,
+        link: projectIdValue ? `/project/${projectIdValue}?task=${task.id}` : `/my-tasks?task=${task.id}`,
+      });
+    }
+
     res.status(201).json(task);
   } catch (error) {
     console.error('Error creating task:', error);
-    res.status(500).json({ error: 'Failed to create task' });
+    const details = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: 'Failed to create task', details });
   }
 };
 
@@ -358,6 +427,22 @@ export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
       },
       userId
     );
+
+    // Notification: if assignee changed, notify new assignee
+    const oldAssignee = normalize(oldTask.assignedUser);
+    const newAssignee = normalize(assignedUser);
+    if (newAssignee && newAssignee !== oldAssignee) {
+      const assignedTo = await resolveUserFromAssignee(assignedUser);
+      if (assignedTo) {
+        await createNotificationSafe({
+          userId: assignedTo.id,
+          type: 'TASK_ASSIGNED',
+          title: 'Task assigned to you',
+          body: updatedTask.title,
+          link: oldTask.project?.id ? `/project/${oldTask.project.id}?task=${updatedTask.id}` : `/my-tasks?task=${updatedTask.id}`,
+        });
+      }
+    }
 
     res.json(updatedTask);
   } catch (error) {

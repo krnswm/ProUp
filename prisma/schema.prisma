@@ -24,6 +24,8 @@ model User {
   memberships   ProjectMember[]
   invitations   Invitation[]
   documents     Document[]
+  notifications Notification[]
+  comments      Comment[]
 }
 
 // Project model - represents a project that contains tasks
@@ -127,11 +129,27 @@ model Task {
   dueDate      String?
   status       String        @default("todo") // "todo" | "inprogress" | "done"
   priority     String        @default("medium") // "low" | "medium" | "high"
+  position     Int           @default(0)
   projectId    Int?          // Optional link to a project
   project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   activityLogs ActivityLog[]
+  comments     Comment[]
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model ActivityLog {
@@ -147,4 +165,20 @@ model ActivityLog {
 
   @@index([taskId])
   @@index([timestamp])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([createdAt])
 }

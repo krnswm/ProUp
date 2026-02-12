@@ -7,6 +7,8 @@ import { handleDemo } from "./routes/demo";
 import { getTasks, getMyTasks, getProjectBoard, reorderTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
 import { getActivityLogs } from "./routes/activityLogs";
 import { getCalendarTasks, getFilteredCalendarTasks } from "./routes/calendar";
+import { getNotifications, getUnreadCount, markAllRead, markNotificationRead } from "./routes/notifications";
+import { createTaskComment, getTaskComments } from "./routes/comments";
 import { 
   getProjects, 
   getProject, 
@@ -71,6 +73,16 @@ export function createServer() {
 
   // Activity log routes
   app.get("/api/tasks/:taskId/activity-logs", getActivityLogs);
+
+  // Comments routes
+  app.get("/api/tasks/:taskId/comments", getTaskComments);
+  app.post("/api/tasks/:taskId/comments", createTaskComment);
+
+  // Notification routes
+  app.get("/api/notifications", getNotifications);
+  app.get("/api/notifications/unread-count", getUnreadCount);
+  app.post("/api/notifications/:id/read", markNotificationRead);
+  app.post("/api/notifications/read-all", markAllRead);
 
   // Calendar routes
   app.get("/api/calendar/tasks", getCalendarTasks);

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, ListTodo, LogOut, Moon, Sun } from "lucide-react";
+import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, ListTodo, Bell, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,40 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation();
   const { setTheme } = useTheme();
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchUnread = async () => {
+      try {
+        const response = await api("/api/notifications/unread-count");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (mounted && typeof data?.count === "number") {
+          setUnreadCount(data.count);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+
+    const onFocus = () => fetchUnread();
+    window.addEventListener("focus", onFocus);
+
+    const onNotificationsRefresh = () => fetchUnread();
+    window.addEventListener("notifications:refresh", onNotificationsRefresh as EventListener);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("notifications:refresh", onNotificationsRefresh as EventListener);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -37,6 +72,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const navItems = [
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { label: "My Tasks", path: "/my-tasks", icon: ListTodo },
+    { label: "Inbox", path: "/inbox", icon: Bell },
     { label: "Projects", path: "/projects", icon: FolderOpen },
     { label: "Calendar", path: "/calendar", icon: CalendarDays },
   ];
@@ -192,53 +228,68 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </AnimatePresence>
           </div>
 
-          {/* User Menu Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <motion.button 
-                className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2 bg-secondary/80 backdrop-blur-sm rounded-xl min-w-0 hover:bg-primary/10 transition-all duration-200 cursor-pointer border border-border/50 shadow-sm hover:shadow-md"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 flex-shrink-0">
-                  <span className="text-xs font-bold text-primary">
-                    {user?.name?.charAt(0).toUpperCase() || "U"}
-                  </span>
-                </div>
-                <div className="hidden sm:block min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-foreground truncate">
-                    {user?.name || "User"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user?.email || ""}
-                  </p>
-                </div>
-              </motion.button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {/* Theme Options */}
-              <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer">
-                <Sun className="mr-2 h-4 w-4" />
-                <span>Light Theme</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer">
-                <Moon className="mr-2 h-4 w-4" />
-                <span>Dark Theme</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer">
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                <span>System Theme</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              {/* Logout */}
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              to="/inbox"
+              className="relative p-2 rounded-xl bg-secondary/80 border border-border/50 hover:bg-primary/10 transition-colors"
+              title="Inbox"
+            >
+              <Bell className="w-5 h-5 text-foreground" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Link>
+
+            {/* User Menu Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <motion.button 
+                  className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2 bg-secondary/80 backdrop-blur-sm rounded-xl min-w-0 hover:bg-primary/10 transition-all duration-200 cursor-pointer border border-border/50 shadow-sm hover:shadow-md"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 flex-shrink-0">
+                    <span className="text-xs font-bold text-primary">
+                      {user?.name?.charAt(0).toUpperCase() || "U"}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-foreground truncate">
+                      {user?.name || "User"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user?.email || ""}
+                    </p>
+                  </div>
+                </motion.button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {/* Theme Options */}
+                <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer">
+                  <Sun className="mr-2 h-4 w-4" />
+                  <span>Light Theme</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer">
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Dark Theme</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>System Theme</span>
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
+                {/* Logout */}
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
         {/* Page Content */}

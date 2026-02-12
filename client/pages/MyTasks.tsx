@@ -1,12 +1,16 @@
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
 import TaskDrawer from "@/components/TaskDrawer";
+import ActivityLogModal from "@/components/ActivityLogModal";
 import { api } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ListTodo } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function MyTasks() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [me, setMe] = useState<{ name: string; email: string } | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +18,10 @@ export default function MyTasks() {
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
+  const [drawerReadOnly, setDrawerReadOnly] = useState(false);
+
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyTask, setHistoryTask] = useState<Task | undefined>();
 
   const fetchMyTasks = async () => {
     try {
@@ -59,16 +67,59 @@ export default function MyTasks() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskParam = params.get("task");
+    if (!taskParam) return;
+
+    const taskId = parseInt(taskParam);
+    if (Number.isNaN(taskId)) return;
+
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    setEditingTask(task);
+    setDrawerReadOnly(true);
+    setIsDrawerOpen(true);
+  }, [location.search, tasks]);
+
+  const normalizeStatus = (value: unknown): Task["status"] => {
+    const raw = String(value ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (raw === "todo" || raw === "to do" || raw === "to-do") return "todo";
+    if (raw === "done" || raw === "completed" || raw === "complete") return "done";
+    if (raw === "inprogress" || raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
+      return "inprogress";
+    }
+
+    // fallback (keeps UI consistent)
+    return "todo";
+  };
+
   const grouped = useMemo(() => {
-    const todo = tasks.filter((t) => t.status === "todo");
-    const inprogress = tasks.filter((t) => t.status === "inprogress");
-    const done = tasks.filter((t) => t.status === "done");
+    const todo = tasks.filter((t) => normalizeStatus(t.status) === "todo");
+    const inprogress = tasks.filter((t) => normalizeStatus(t.status) === "inprogress");
+    const done = tasks.filter((t) => normalizeStatus(t.status) === "done");
     return { todo, inprogress, done };
   }, [tasks]);
 
   const handleOpenTask = (task: Task) => {
     setEditingTask(task);
+    setDrawerReadOnly(true);
     setIsDrawerOpen(true);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setDrawerReadOnly(false);
+    setIsDrawerOpen(true);
+  };
+
+  const handleViewHistory = (task: Task) => {
+    setHistoryTask(task);
+    setIsHistoryModalOpen(true);
   };
 
   const handleSaveTask = async (newTask: Omit<Task, "id">) => {
@@ -121,9 +172,9 @@ export default function MyTasks() {
                 key={task.id}
                 task={task}
                 onOpen={handleOpenTask}
-                onEdit={handleOpenTask}
+                onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
-                onHistory={handleOpenTask}
+                onHistory={handleViewHistory}
               />
             ))}
           </div>
@@ -199,11 +250,33 @@ export default function MyTasks() {
         open={isDrawerOpen}
         onOpenChange={(open) => {
           setIsDrawerOpen(open);
-          if (!open) setEditingTask(undefined);
+          if (!open) {
+            setEditingTask(undefined);
+            setDrawerReadOnly(false);
+            const params = new URLSearchParams(location.search);
+            if (params.has("task")) {
+              params.delete("task");
+              const next = params.toString();
+              navigate({ pathname: location.pathname, search: next ? `?${next}` : "" }, { replace: true });
+            }
+          }
         }}
         onSave={handleSaveTask}
         task={editingTask}
+        readOnly={drawerReadOnly}
       />
+
+      {historyTask && (
+        <ActivityLogModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => {
+            setIsHistoryModalOpen(false);
+            setHistoryTask(undefined);
+          }}
+          taskId={historyTask.id}
+          taskTitle={historyTask.title}
+        />
+      )}
     </MainLayout>
   );
 }

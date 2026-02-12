@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
@@ -22,8 +22,11 @@ interface Project {
 export default function ProjectDetails() {
   const { projectId } = useParams();
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
+  const [drawerReadOnly, setDrawerReadOnly] = useState(false);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -74,18 +77,37 @@ export default function ProjectDetails() {
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskParam = params.get("task");
+    if (!taskParam) return;
+
+    const taskId = parseInt(taskParam);
+    if (Number.isNaN(taskId)) return;
+
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    setEditingTask(task);
+    setDrawerReadOnly(true);
+    setIsDrawerOpen(true);
+  }, [location.search, tasks]);
+
   const handleAddTask = () => {
     setEditingTask(undefined);
+    setDrawerReadOnly(false);
     setIsDrawerOpen(true);
   };
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
+    setDrawerReadOnly(false);
     setIsDrawerOpen(true);
   };
 
   const handleOpenTask = (task: Task) => {
     setEditingTask(task);
+    setDrawerReadOnly(true);
     setIsDrawerOpen(true);
   };
 
@@ -440,10 +462,20 @@ export default function ProjectDetails() {
         open={isDrawerOpen}
         onOpenChange={(open) => {
           setIsDrawerOpen(open);
-          if (!open) setEditingTask(undefined);
+          if (!open) {
+            setEditingTask(undefined);
+            setDrawerReadOnly(false);
+            const params = new URLSearchParams(location.search);
+            if (params.has("task")) {
+              params.delete("task");
+              const next = params.toString();
+              navigate({ pathname: location.pathname, search: next ? `?${next}` : "" }, { replace: true });
+            }
+          }
         }}
         onSave={handleSaveTask}
         task={editingTask}
+        readOnly={drawerReadOnly}
       />
 
       {/* Activity Log Modal */}
