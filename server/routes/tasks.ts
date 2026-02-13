@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { prisma } from '../prisma';
 import { logTaskChanges, logTaskCreation } from '../services/activityLog';
 import { AuthRequest } from '../middleware/authorize';
+import { getIO } from '../realtime';
 
 type TaskStatus = 'todo' | 'inprogress' | 'done';
 
@@ -61,7 +62,7 @@ const createNotificationSafe = async (input: {
   link?: string | null;
 }) => {
   try {
-    await prisma.notification.create({
+    const created = await prisma.notification.create({
       data: {
         userId: input.userId,
         type: input.type,
@@ -70,9 +71,18 @@ const createNotificationSafe = async (input: {
         link: input.link ?? null,
       },
     });
+
+    const io = getIO();
+    io?.to(`user:${input.userId}`).emit('notification:created', created);
   } catch (error) {
     console.error('Failed to create notification:', error);
   }
+};
+
+const emitToProject = (projectId: number | null | undefined, event: string, payload: any) => {
+  if (!projectId) return;
+  const io = getIO();
+  io?.to(`project:${projectId}`).emit(event, payload);
 };
 
 // GET /api/tasks - Get tasks for the authenticated user's projects
@@ -333,6 +343,8 @@ export const createTask: RequestHandler = async (req: AuthRequest, res) => {
       });
     }
 
+    emitToProject(projectIdValue, 'task:created', { task });
+
     res.status(201).json(task);
   } catch (error) {
     console.error('Error creating task:', error);
@@ -444,6 +456,12 @@ export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
       }
     }
 
+    const currentProjectId = updatedTask.projectId ?? oldTask.project?.id ?? null;
+    emitToProject(currentProjectId, 'task:updated', { task: updatedTask });
+    if (oldTask.project?.id && currentProjectId !== oldTask.project.id) {
+      emitToProject(oldTask.project.id, 'task:updated', { task: updatedTask });
+    }
+
     res.json(updatedTask);
   } catch (error) {
     console.error('Error updating task:', error);
@@ -480,6 +498,23 @@ export const reorderTasks: RequestHandler = async (req: AuthRequest, res) => {
       )
     );
 
+    const updated = await prisma.task.findMany({
+      where: { id: { in: moves.map((m) => m.id) } },
+      select: { id: true, projectId: true, status: true, position: true },
+    });
+
+    const byProject = new Map<number, typeof updated>();
+    for (const t of updated) {
+      if (!t.projectId) continue;
+      const arr = byProject.get(t.projectId) ?? [];
+      arr.push(t);
+      byProject.set(t.projectId, arr);
+    }
+
+    for (const [projectId, items] of byProject.entries()) {
+      emitToProject(projectId, 'task:reordered', { tasks: items });
+    }
+
     res.json({ ok: true });
   } catch (error) {
     console.error('Error reordering tasks:', error);
@@ -493,9 +528,18 @@ export const deleteTask: RequestHandler = async (req, res) => {
     const { id } = req.params;
     const taskId = Array.isArray(id) ? id[0] : id;
 
+    const existing = await prisma.task.findUnique({
+      where: { id: parseInt(taskId) },
+      select: { id: true, projectId: true },
+    });
+
     await prisma.task.delete({
       where: { id: parseInt(taskId) },
     });
+
+    if (existing?.projectId) {
+      emitToProject(existing.projectId, 'task:deleted', { taskId: existing.id });
+    }
 
     res.status(204).send();
   } catch (error) {

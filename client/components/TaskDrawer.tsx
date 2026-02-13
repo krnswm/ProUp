@@ -3,8 +3,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Calendar, User, Flag, CheckCircle } from "lucide-react";
+import { X, Calendar, User, Flag, CheckCircle, Pencil, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -36,6 +39,123 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
       default:
         return "bg-gray-100 text-gray-700 border-gray-200";
     }
+  };
+
+  const handleUpdateComment = async (commentId: number) => {
+    if (!task?.id) return;
+    const body = editingBody.trim();
+    if (!body) return;
+
+    try {
+      setCommentError(null);
+      const response = await api(`/api/tasks/${task.id}/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ body }),
+      });
+
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(txt || "Failed to update comment");
+      }
+
+      const updated = (await response.json()) as CommentItem;
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+      setEditingCommentId(null);
+      setEditingBody("");
+    } catch (e) {
+      setCommentError(e instanceof Error ? e.message : "Failed to update comment");
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!task?.id) return;
+
+    try {
+      setCommentError(null);
+      const response = await api(`/api/tasks/${task.id}/comments/${commentId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(txt || "Failed to delete comment");
+      }
+
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setEditingBody("");
+      }
+    } catch (e) {
+      setCommentError(e instanceof Error ? e.message : "Failed to delete comment");
+    }
+  };
+
+  const meId = useMemo(() => {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem("userId") : null;
+    const id = raw ? parseInt(raw) : NaN;
+    return Number.isNaN(id) ? null : id;
+  }, []);
+
+  const renderMentionText = (text: string) => {
+    const parts: Array<{ type: "text" | "mention"; value: string }> = [];
+    const regex = /@"([^"]+)"|@([a-zA-Z0-9._-]+)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(text))) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (start > lastIndex) {
+        parts.push({ type: "text", value: text.slice(lastIndex, start) });
+      }
+      parts.push({ type: "mention", value: match[0] });
+      lastIndex = end;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push({ type: "text", value: text.slice(lastIndex) });
+    }
+
+    return (
+      <>
+        {parts.map((p, idx) =>
+          p.type === "mention" ? (
+            <span key={idx} className="text-primary font-medium">
+              {p.value}
+            </span>
+          ) : (
+            <span key={idx}>{p.value}</span>
+          )
+        )}
+      </>
+    );
+  };
+
+  const computeMentionState = (value: string, cursor: number) => {
+    const left = value.slice(0, cursor);
+    const atIndex = left.lastIndexOf("@");
+    if (atIndex < 0) return null;
+    if (atIndex > 0 && /\S/.test(left[atIndex - 1])) return null;
+
+    const query = left.slice(atIndex + 1);
+    if (query.includes("\n") || query.includes("\r") || query.includes("\t") || query.includes(" ")) return null;
+    if (query.startsWith('"')) return null;
+
+    return {
+      query,
+      range: { start: atIndex, end: cursor },
+    };
+  };
+
+  const insertMention = (user: UserItem) => {
+    if (!mentionRange) return;
+    const mentionText = `@"${user.name}" `;
+    const next = commentBody.slice(0, mentionRange.start) + mentionText + commentBody.slice(mentionRange.end);
+    setCommentBody(next);
+    setMentionOpen(false);
+    setMentionQuery("");
+    setMentionRange(null);
   };
 
   const getStatusStyles = (value: string) => {
@@ -91,10 +211,26 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
     author?: { id: number; name: string; email: string };
   };
 
+  type UserItem = {
+    id: number;
+    name: string;
+    email: string;
+  };
+
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [commentError, setCommentError] = useState<string | null>(null);
+
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionRange, setMentionRange] = useState<{ start: number; end: number } | null>(null);
+
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingBody, setEditingBody] = useState("");
 
   const canSave = useMemo(() => {
     return title.trim().length > 0 && assignedUser.trim().length > 0 && dueDate.trim().length > 0;
@@ -136,6 +272,59 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
 
     fetchComments();
   }, [open, task?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!task?.id) return;
+
+    const socket = getRealtimeSocket();
+    socket.emit("join-task", { taskId: task.id });
+
+    const onCreated = ({ comment }: { comment: CommentItem }) => {
+      setComments((prev) => {
+        if (prev.some((c) => c.id === comment.id)) return prev;
+        return [...prev, comment];
+      });
+    };
+
+    const onUpdated = ({ comment }: { comment: CommentItem }) => {
+      setComments((prev) => prev.map((c) => (c.id === comment.id ? comment : c)));
+    };
+
+    const onDeleted = ({ commentId }: { commentId: number }) => {
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    };
+
+    socket.on("comment:created", onCreated);
+    socket.on("comment:updated", onUpdated);
+    socket.on("comment:deleted", onDeleted);
+
+    return () => {
+      socket.emit("leave-task", { taskId: task.id });
+      socket.off("comment:created", onCreated);
+      socket.off("comment:updated", onUpdated);
+      socket.off("comment:deleted", onDeleted);
+    };
+  }, [open, task?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (usersLoaded) return;
+
+    const loadUsers = async () => {
+      try {
+        const response = await api("/api/auth/users");
+        if (!response.ok) return;
+        const data = (await response.json()) as UserItem[];
+        setUsers(Array.isArray(data) ? data : []);
+        setUsersLoaded(true);
+      } catch {
+        // ignore
+      }
+    };
+
+    loadUsers();
+  }, [open, usersLoaded]);
 
   useEffect(() => {
     if (!open) return;
@@ -216,8 +405,54 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
                       {new Date(c.createdAt).toLocaleString()}
                     </p>
                   </div>
+
+                  {meId !== null && c.authorId === meId && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCommentId(c.id);
+                          setEditingBody(c.body);
+                        }}
+                        className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                        aria-label="Edit comment"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteComment(c.id)}
+                        className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+                        aria-label="Delete comment"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm text-foreground mt-2 whitespace-pre-wrap">{c.body}</p>
+
+                {editingCommentId === c.id ? (
+                  <div className="mt-2 space-y-2">
+                    <Textarea value={editingBody} onChange={(e) => setEditingBody(e.target.value)} rows={3} />
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingCommentId(null);
+                          setEditingBody("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={() => handleUpdateComment(c.id)} disabled={!editingBody.trim()}>
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground mt-2 whitespace-pre-wrap">{renderMentionText(c.body)}</p>
+                )}
               </div>
             ))}
           </div>
@@ -225,12 +460,71 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Add a comment</label>
-          <Textarea
-            value={commentBody}
-            onChange={(e) => setCommentBody(e.target.value)}
-            placeholder='Type a comment. Mention someone with @"Full Name" or @email'
-            rows={3}
-          />
+
+          <Popover open={mentionOpen} onOpenChange={setMentionOpen}>
+            <PopoverTrigger asChild>
+              <Textarea
+                value={commentBody}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCommentBody(next);
+                  const cursor = e.target.selectionStart ?? next.length;
+                  const state = computeMentionState(next, cursor);
+                  if (!state) {
+                    setMentionOpen(false);
+                    setMentionQuery("");
+                    setMentionRange(null);
+                    return;
+                  }
+
+                  setMentionQuery(state.query);
+                  setMentionRange(state.range);
+                  setMentionOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (mentionOpen && e.key === "Escape") {
+                    e.preventDefault();
+                    setMentionOpen(false);
+                  }
+                }}
+                placeholder='Type a comment. Mention with @ then pick a user (inserts @"Full Name")'
+                rows={3}
+              />
+            </PopoverTrigger>
+
+            <PopoverContent align="start" sideOffset={8} className="p-0 w-80">
+              <Command>
+                <CommandInput placeholder="Search people..." value={mentionQuery} onValueChange={setMentionQuery} />
+                <CommandList>
+                  <CommandEmpty>No users found.</CommandEmpty>
+                  <CommandGroup>
+                    {users
+                      .filter((u) => {
+                        const q = mentionQuery.trim().toLowerCase();
+                        if (!q) return true;
+                        return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                      })
+                      .slice(0, 8)
+                      .map((u) => (
+                        <CommandItem
+                          key={u.id}
+                          value={u.name}
+                          onSelect={() => {
+                            insertMention(u);
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{u.name}</span>
+                            <span className="text-xs text-muted-foreground">{u.email}</span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
           <div className="flex items-center justify-end">
             <Button type="button" onClick={handleAddComment} disabled={!commentBody.trim()}>
               Post

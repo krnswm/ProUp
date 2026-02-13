@@ -10,6 +10,7 @@ import ProjectMembersTab from "@/components/ProjectMembersTab";
 import DocumentsList from "@/components/DocumentsList";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 interface Project {
   id: number;
@@ -46,6 +47,61 @@ export default function ProjectDetails() {
     const interval = setInterval(fetchTasks, 10000);
     
     return () => clearInterval(interval);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const socket = getRealtimeSocket();
+    socket.emit("join-project", { projectId });
+
+    const onTaskCreated = ({ task }: { task: Task }) => {
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === task.id)) return prev;
+        return [...prev, task];
+      });
+    };
+
+    const onTaskUpdated = ({ task }: { task: Task }) => {
+      setTasks((prev) => {
+        const idx = prev.findIndex((t) => t.id === task.id);
+        if (idx === -1) return [...prev, task];
+        const next = [...prev];
+        next[idx] = task;
+        return next;
+      });
+    };
+
+    const onTaskDeleted = ({ taskId }: { taskId: number }) => {
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    };
+
+    const onTaskReordered = ({ tasks: moved }: { tasks: Array<{ id: number; status?: any; position?: number }> }) => {
+      setTasks((prev) =>
+        prev.map((t) => {
+          const hit = moved.find((m) => m.id === t.id);
+          if (!hit) return t;
+          return {
+            ...t,
+            status: (hit.status ?? t.status) as any,
+            position: typeof hit.position === "number" ? (hit.position as any) : (t as any).position,
+          } as any;
+        })
+      );
+    };
+
+    socket.on("task:created", onTaskCreated);
+    socket.on("task:updated", onTaskUpdated);
+    socket.on("task:deleted", onTaskDeleted);
+    socket.on("task:reordered", onTaskReordered);
+
+    return () => {
+      socket.emit("leave-project", { projectId });
+      socket.off("task:created", onTaskCreated);
+      socket.off("task:updated", onTaskUpdated);
+      socket.off("task:deleted", onTaskDeleted);
+      socket.off("task:reordered", onTaskReordered);
+    };
   }, [projectId]);
 
   const fetchProject = async () => {

@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import TaskDrawer from "@/components/TaskDrawer";
 import type { Task } from "@/components/TaskCard";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 
 type Notification = {
   id: number;
@@ -57,6 +58,30 @@ export default function Inbox() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 15000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem("userId") : null;
+    const userId = raw ? parseInt(raw) : NaN;
+    if (Number.isNaN(userId)) return;
+
+    const socket = getRealtimeSocket();
+    socket.emit("join-user", { userId });
+
+    const onRefresh = () => {
+      fetchNotifications();
+    };
+
+    socket.on("notification:created", onRefresh);
+    socket.on("notification:read", onRefresh);
+    socket.on("notification:readAll", onRefresh);
+
+    return () => {
+      socket.emit("leave-user", { userId });
+      socket.off("notification:created", onRefresh);
+      socket.off("notification:read", onRefresh);
+      socket.off("notification:readAll", onRefresh);
+    };
   }, []);
 
   const markRead = async (id: number) => {

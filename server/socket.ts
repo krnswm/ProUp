@@ -1,5 +1,8 @@
-import { Server as HttpServer } from 'http';
+import type { Server as HttpServer } from 'http';
+import type { Server as HttpsServer } from 'https';
+import type { Http2Server, Http2SecureServer } from 'http2';
 import { Server, Socket } from 'socket.io';
+import { getIO, setIO } from './realtime';
 
 interface UserCursor {
   socketId: string;
@@ -28,13 +31,53 @@ const generateColor = () => {
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
-export function setupSocketServer(httpServer: HttpServer) {
+type AnyHttpServer = HttpServer | HttpsServer | Http2Server | Http2SecureServer;
+
+export function setupSocketServer(httpServer: AnyHttpServer) {
+  const existing = getIO();
+  if (existing) return existing;
+
   const io = new Server(httpServer, {
     cors: {
       origin: '*',
       methods: ['GET', 'POST'],
     },
     path: '/socket.io',
+  });
+
+  setIO(io);
+
+  // Default namespace: realtime tasks/comments/notifications
+  io.on('connection', (socket: Socket) => {
+    socket.on('join-project', ({ projectId }: { projectId: string | number }) => {
+      if (projectId === undefined || projectId === null) return;
+      socket.join(`project:${projectId}`);
+    });
+
+    socket.on('join-task', ({ taskId }: { taskId: string | number }) => {
+      if (taskId === undefined || taskId === null) return;
+      socket.join(`task:${taskId}`);
+    });
+
+    socket.on('join-user', ({ userId }: { userId: string | number }) => {
+      if (userId === undefined || userId === null) return;
+      socket.join(`user:${userId}`);
+    });
+
+    socket.on('leave-project', ({ projectId }: { projectId: string | number }) => {
+      if (projectId === undefined || projectId === null) return;
+      socket.leave(`project:${projectId}`);
+    });
+
+    socket.on('leave-task', ({ taskId }: { taskId: string | number }) => {
+      if (taskId === undefined || taskId === null) return;
+      socket.leave(`task:${taskId}`);
+    });
+
+    socket.on('leave-user', ({ userId }: { userId: string | number }) => {
+      if (userId === undefined || userId === null) return;
+      socket.leave(`user:${userId}`);
+    });
   });
 
   // Whiteboard namespace

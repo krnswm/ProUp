@@ -8,7 +8,7 @@ import { getTasks, getMyTasks, getProjectBoard, reorderTasks, getTask, createTas
 import { getActivityLogs } from "./routes/activityLogs";
 import { getCalendarTasks, getFilteredCalendarTasks } from "./routes/calendar";
 import { getNotifications, getUnreadCount, markAllRead, markNotificationRead } from "./routes/notifications";
-import { createTaskComment, getTaskComments } from "./routes/comments";
+import { createTaskComment, deleteTaskComment, getTaskComments, updateTaskComment } from "./routes/comments";
 import { 
   getProjects, 
   getProject, 
@@ -77,6 +77,8 @@ export function createServer() {
   // Comments routes
   app.get("/api/tasks/:taskId/comments", getTaskComments);
   app.post("/api/tasks/:taskId/comments", createTaskComment);
+  app.patch("/api/tasks/:taskId/comments/:commentId", updateTaskComment);
+  app.delete("/api/tasks/:taskId/comments/:commentId", deleteTaskComment);
 
   // Notification routes
   app.get("/api/notifications", getNotifications);

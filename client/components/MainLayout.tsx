@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,28 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const { setTheme } = useTheme();
   const { user, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const socket = getRealtimeSocket();
+    socket.emit("join-user", { userId: user.id });
+
+    const triggerRefresh = () => {
+      window.dispatchEvent(new CustomEvent("notifications:refresh"));
+    };
+
+    socket.on("notification:created", triggerRefresh);
+    socket.on("notification:read", triggerRefresh);
+    socket.on("notification:readAll", triggerRefresh);
+
+    return () => {
+      socket.emit("leave-user", { userId: user.id });
+      socket.off("notification:created", triggerRefresh);
+      socket.off("notification:read", triggerRefresh);
+      socket.off("notification:readAll", triggerRefresh);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -145,7 +168,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     <Icon className={`w-5 h-5 flex-shrink-0 relative z-10 ${
                       active ? "" : "group-hover:scale-110 transition-transform"
                     }`} />
-                    <span className="truncate relative z-10">{item.label}</span>
+                    <span className="truncate relative z-10 flex-1">{item.label}</span>
+                    {item.path === "/inbox" && unreadCount > 0 && (
+                      <span
+                        className={`relative z-10 min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                          active ? "bg-white/20 text-white" : "bg-primary text-primary-foreground"
+                        }`}
+                      >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </Link>
                 </motion.div>
               );
