@@ -28,6 +28,27 @@ interface TaskDrawerProps {
 export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly = false }: TaskDrawerProps) {
   const isEdit = !!task;
 
+  type DependencyTask = {
+    id: number;
+    title: string;
+    status: string;
+    projectId: number | null;
+  };
+
+  type BlockedByItem = {
+    id: number;
+    blockedTaskId: number;
+    blockingTaskId: number;
+    blockingTask: DependencyTask;
+  };
+
+  type BlocksItem = {
+    id: number;
+    blockedTaskId: number;
+    blockingTaskId: number;
+    blockedTask: DependencyTask;
+  };
+
   const getPriorityStyles = (value: string) => {
     switch (value) {
       case "high":
@@ -202,6 +223,12 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
   const [status, setStatus] = useState<"todo" | "inprogress" | "done">("todo");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
 
+  const [blockedBy, setBlockedBy] = useState<BlockedByItem[]>([]);
+  const [blocks, setBlocks] = useState<BlocksItem[]>([]);
+  const [dependencyError, setDependencyError] = useState<string | null>(null);
+  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
+  const [selectedDependsOnId, setSelectedDependsOnId] = useState<string>("");
+
   type CommentItem = {
     id: number;
     taskId: number;
@@ -248,6 +275,10 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
     }
   }, [task]);
 
+  const isBlocked = useMemo(() => {
+    return blockedBy.some((d) => String(d.blockingTask?.status) !== "done");
+  }, [blockedBy]);
+
   useEffect(() => {
     if (!open) return;
     if (!task?.id) return;
@@ -272,6 +303,49 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
 
     fetchComments();
   }, [open, task?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!task?.id) return;
+
+    const fetchDependencies = async () => {
+      try {
+        setDependencyError(null);
+        const response = await api(`/api/tasks/${task.id}/dependencies`);
+        if (!response.ok) {
+          const txt = await response.text();
+          throw new Error(txt || "Failed to load dependencies");
+        }
+
+        const data = await response.json();
+        setBlockedBy(Array.isArray(data?.blockedBy) ? data.blockedBy : []);
+        setBlocks(Array.isArray(data?.blocks) ? data.blocks : []);
+      } catch (e) {
+        setDependencyError(e instanceof Error ? e.message : "Failed to load dependencies");
+      }
+    };
+
+    fetchDependencies();
+  }, [open, task?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!task?.projectId) return;
+
+    const fetchProjectTasks = async () => {
+      try {
+        const response = await api(`/api/projects/${task.projectId}/board`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const tasks = Array.isArray(data?.tasks) ? (data.tasks as Task[]) : [];
+        setProjectTasks(tasks);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchProjectTasks();
+  }, [open, task?.projectId]);
 
   useEffect(() => {
     if (!open) return;
@@ -342,6 +416,11 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
     if (readOnly) return;
     if (!canSave) return;
 
+    if (status === "done" && isBlocked) {
+      setDependencyError("This task is blocked by incomplete dependencies. Complete them before marking as Done.");
+      return;
+    }
+
     onSave({
       title: title.trim(),
       description: description.trim() ? description.trim() : undefined,
@@ -352,6 +431,58 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
     });
 
     onOpenChange(false);
+  };
+
+  const handleAddDependency = async () => {
+    if (!task?.id) return;
+    if (!task.projectId) return;
+    const id = parseInt(selectedDependsOnId);
+    if (Number.isNaN(id)) return;
+
+    try {
+      setDependencyError(null);
+      const response = await api(`/api/tasks/${task.id}/dependencies`, {
+        method: "POST",
+        body: JSON.stringify({ dependsOnTaskId: id }),
+      });
+
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(txt || "Failed to add dependency");
+      }
+
+      const created = await response.json();
+      if (created?.blockingTask) {
+        setBlockedBy((prev) => {
+          if (prev.some((p) => p.blockingTaskId === created.blockingTaskId)) return prev;
+          return [...prev, created];
+        });
+      }
+
+      setSelectedDependsOnId("");
+    } catch (e) {
+      setDependencyError(e instanceof Error ? e.message : "Failed to add dependency");
+    }
+  };
+
+  const handleRemoveDependency = async (dependsOnTaskId: number) => {
+    if (!task?.id) return;
+
+    try {
+      setDependencyError(null);
+      const response = await api(`/api/tasks/${task.id}/dependencies/${dependsOnTaskId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const txt = await response.text();
+        throw new Error(txt || "Failed to remove dependency");
+      }
+
+      setBlockedBy((prev) => prev.filter((p) => p.blockingTaskId !== dependsOnTaskId));
+    } catch (e) {
+      setDependencyError(e instanceof Error ? e.message : "Failed to remove dependency");
+    }
   };
 
   const handleAddComment = async () => {
@@ -677,14 +808,27 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Status</label>
-                <Select value={status} onValueChange={(v) => setStatus(v as any)} disabled={readOnly}>
+                <Select
+                  value={status}
+                  onValueChange={(v) => {
+                    const next = v as any;
+                    if (next === "done" && isBlocked) {
+                      setDependencyError("This task is blocked by incomplete dependencies. Complete them before marking as Done.");
+                      return;
+                    }
+                    setStatus(next);
+                  }}
+                  disabled={readOnly}
+                >
                   <SelectTrigger disabled={readOnly}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="inprogress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="done" disabled={isBlocked}>
+                      Done
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -703,6 +847,90 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
                 </Select>
               </div>
             </div>
+
+            {isEdit && task?.projectId && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">Dependencies</label>
+                  {isBlocked && (
+                    <span className="text-xs font-semibold px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
+                      Blocked
+                    </span>
+                  )}
+                </div>
+
+                {dependencyError && <div className="text-sm text-red-500">{dependencyError}</div>}
+
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Blocked by</p>
+                  {blockedBy.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No dependencies.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {blockedBy.map((d) => (
+                        <div key={d.id} className="flex items-center justify-between gap-3 bg-secondary/30 border border-border rounded-lg px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{d.blockingTask.title}</p>
+                            <p className="text-xs text-muted-foreground">Status: {getStatusLabel(String(d.blockingTask.status))}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleRemoveDependency(d.blockingTaskId)}
+                            disabled={readOnly}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {!readOnly && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Add dependency</p>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedDependsOnId}
+                        onChange={(e) => setSelectedDependsOnId(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground"
+                      >
+                        <option value="">Select a task…</option>
+                        {projectTasks
+                          .filter((t) => t.id !== task.id)
+                          .filter((t) => !blockedBy.some((d) => d.blockingTaskId === t.id))
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.title} ({getStatusLabel(t.status)})
+                            </option>
+                          ))}
+                      </select>
+                      <Button type="button" onClick={handleAddDependency} disabled={!selectedDependsOnId}>
+                        Add
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      You won’t be able to mark this task as Done until all dependencies are Done.
+                    </p>
+                  </div>
+                )}
+
+                {blocks.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">This task blocks</p>
+                    <div className="space-y-2">
+                      {blocks.map((d) => (
+                        <div key={d.id} className="bg-secondary/30 border border-border rounded-lg px-3 py-2">
+                          <p className="text-sm font-medium text-foreground truncate">{d.blockedTask.title}</p>
+                          <p className="text-xs text-muted-foreground">Status: {getStatusLabel(String(d.blockedTask.status))}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="p-6 border-t border-border flex items-center justify-end gap-3">

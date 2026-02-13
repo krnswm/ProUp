@@ -165,6 +165,24 @@ model Task {
   updatedAt    DateTime      @updatedAt
   activityLogs ActivityLog[]
   comments     Comment[]
+
+  // Dependencies
+  blockedBy    TaskDependency[] @relation("BlockedTask")
+  blocks       TaskDependency[] @relation("BlockingTask")
+}
+
+model TaskDependency {
+  id              Int  @id @default(autoincrement())
+  blockedTaskId   Int
+  blockingTaskId  Int
+
+  // Relations
+  blockedTask     Task @relation("BlockedTask", fields: [blockedTaskId], references: [id], onDelete: Cascade)
+  blockingTask    Task @relation("BlockingTask", fields: [blockingTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([blockedTaskId, blockingTaskId])
+  @@index([blockedTaskId])
+  @@index([blockingTaskId])
 }
 
 model Comment {

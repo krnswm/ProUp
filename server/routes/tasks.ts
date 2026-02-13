@@ -85,6 +85,25 @@ const emitToProject = (projectId: number | null | undefined, event: string, payl
   io?.to(`project:${projectId}`).emit(event, payload);
 };
 
+const assertNotBlockedForDone = async (taskId: number) => {
+  const deps = await prisma.taskDependency.findMany({
+    where: { blockedTaskId: taskId },
+    include: { blockingTask: { select: { id: true, status: true, title: true } } },
+  });
+
+  const blocking = deps
+    .map((d) => d.blockingTask)
+    .filter((t) => String(t.status) !== 'done');
+
+  if (blocking.length > 0) {
+    const titles = blocking.map((t) => t.title).slice(0, 5).join(', ');
+    const message = `Task is blocked by ${blocking.length} dependency(ies): ${titles}`;
+    const error = new Error(message);
+    (error as any).code = 'TASK_BLOCKED';
+    throw error;
+  }
+};
+
 // GET /api/tasks - Get tasks for the authenticated user's projects
 export const getTasks: RequestHandler = async (req: AuthRequest, res) => {
   try {
@@ -374,6 +393,15 @@ export const updateTask: RequestHandler = async (req: AuthRequest, res) => {
     const newStatus = status ? parseStatus(status) : null;
     const isStatusChanged = newStatus !== null && newStatus !== oldTask.status;
 
+    if (isStatusChanged && newStatus === 'done') {
+      try {
+        await assertNotBlockedForDone(oldTask.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Task is blocked';
+        return res.status(400).json({ error: message, code: (error as any)?.code ?? 'TASK_BLOCKED' });
+      }
+    }
+
     const projectIdValue: number | null = projectId === null ? null : projectId !== undefined ? parseInt(projectId) : undefined;
     const isProjectChanged = projectIdValue !== undefined;
 
@@ -484,6 +512,19 @@ export const reorderTasks: RequestHandler = async (req: AuthRequest, res) => {
 
     if (!Array.isArray(moves) || moves.length === 0) {
       return res.status(400).json({ error: 'moves is required' });
+    }
+
+    // Hard-block: prevent moving to done if blocked
+    const movingToDone = moves.filter((m) => m.status === 'done').map((m) => m.id);
+    if (movingToDone.length > 0) {
+      try {
+        for (const id of movingToDone) {
+          await assertNotBlockedForDone(id);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Task is blocked';
+        return res.status(400).json({ error: message, code: (error as any)?.code ?? 'TASK_BLOCKED' });
+      }
     }
 
     await prisma.$transaction(

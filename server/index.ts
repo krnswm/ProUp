@@ -29,6 +29,7 @@ import { getWhiteboard, saveWhiteboard } from "./routes/whiteboard";
 import { getDocuments, getDocument, createDocument, updateDocument, deleteDocument } from "./routes/documents";
 import { setupSocketServer } from "./socket";
 import { getProjectTemplates } from "./routes/projectTemplates";
+import { addTaskDependency, getTaskDependencies, removeTaskDependency } from "./routes/taskDependencies";
 
 export function createServer() {
   const app = express();
@@ -80,6 +81,11 @@ export function createServer() {
   app.post("/api/tasks/:taskId/comments", createTaskComment);
   app.patch("/api/tasks/:taskId/comments/:commentId", updateTaskComment);
   app.delete("/api/tasks/:taskId/comments/:commentId", deleteTaskComment);
+
+  // Task dependency routes
+  app.get("/api/tasks/:taskId/dependencies", getTaskDependencies);
+  app.post("/api/tasks/:taskId/dependencies", addTaskDependency);
+  app.delete("/api/tasks/:taskId/dependencies/:dependsOnTaskId", removeTaskDependency);
 
   // Notification routes
   app.get("/api/notifications", getNotifications);
