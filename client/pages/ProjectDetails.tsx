@@ -12,6 +12,9 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { bumpCompletionStreak, confettiBurst, readCompletionStreak } from "@/lib/confetti";
+import { incrementDoneCount, listAchievements, unlockAchievements } from "@/lib/achievements";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 interface Project {
   id: number;
@@ -51,6 +54,15 @@ export default function ProjectDetails() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [streak, setStreak] = useState(() => readCompletionStreak().streak);
+  const [unlockedIds, setUnlockedIds] = useState<string[]>(() => {
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem("achievements:unlocked") : null;
+      const arr = raw ? (JSON.parse(raw) as string[]) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Fetch project and tasks from backend
   useEffect(() => {
@@ -226,7 +238,16 @@ export default function ProjectDetails() {
 
           if (beforeStatus !== "done" && updatedTask?.status === "done") {
             confettiBurst();
-            setStreak(bumpCompletionStreak().streak);
+            const nextStreak = bumpCompletionStreak().streak;
+            setStreak(nextStreak);
+            const doneCount = incrementDoneCount();
+            const newly = unlockAchievements({ streak: nextStreak, doneCount });
+            if (newly.length > 0) {
+              setUnlockedIds((prev) => Array.from(new Set([...prev, ...newly.map((a) => a.id)])));
+              for (const a of newly) {
+                toast(a.title, { description: a.description });
+              }
+            }
             fetchLeaderboard();
           }
         }
@@ -302,7 +323,16 @@ export default function ProjectDetails() {
 
           if (beforeStatus !== "done" && savedTask?.status === "done") {
             confettiBurst();
-            setStreak(bumpCompletionStreak().streak);
+            const nextStreak = bumpCompletionStreak().streak;
+            setStreak(nextStreak);
+            const doneCount = incrementDoneCount();
+            const newly = unlockAchievements({ streak: nextStreak, doneCount });
+            if (newly.length > 0) {
+              setUnlockedIds((prev) => Array.from(new Set([...prev, ...newly.map((a) => a.id)])));
+              for (const a of newly) {
+                toast(a.title, { description: a.description });
+              }
+            }
             fetchLeaderboard();
           }
         }
@@ -529,8 +559,23 @@ export default function ProjectDetails() {
           </div>
         </motion.div>
 
-        {/* Fun: streak + leaderboard */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Momentum */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-bold text-foreground">Momentum</h2>
+            <div className="flex items-center gap-2">
+              {listAchievements()
+                .filter((a) => unlockedIds.includes(a.id))
+                .slice(0, 3)
+                .map((a) => (
+                  <Badge key={a.id} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                    {a.title}
+                  </Badge>
+                ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <motion.div
             className="lg:col-span-1 bg-gradient-to-br from-primary/10 via-card to-purple-500/10 rounded-2xl p-6 border border-border shadow-lg"
             initial={{ opacity: 0, y: 10 }}
@@ -604,6 +649,7 @@ export default function ProjectDetails() {
               )}
             </div>
           </motion.div>
+          </div>
         </div>
 
         {/* Add Task Button */}
