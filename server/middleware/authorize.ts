@@ -47,7 +47,9 @@ export const authorize = (requiredPermission: string) => {
       }
 
       // Get project ID from params
-      const projectId = parseInt(req.params.id || req.params.projectId || '0');
+      const idRaw = (req.params as any).id ?? (req.params as any).projectId ?? '0';
+      const idValue = Array.isArray(idRaw) ? idRaw[0] : idRaw;
+      const projectId = parseInt(String(idValue));
       if (!projectId) {
         return res.status(400).json({ error: 'Project ID is required' });
       }
@@ -120,7 +122,9 @@ export const requireRole = (minRole: string) => {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      const projectId = parseInt(req.params.id || req.params.projectId || '0');
+      const idRaw = (req.params as any).id ?? (req.params as any).projectId ?? '0';
+      const idValue = Array.isArray(idRaw) ? idRaw[0] : idRaw;
+      const projectId = parseInt(String(idValue));
       if (!projectId) {
         return res.status(400).json({ error: 'Project ID is required' });
       }

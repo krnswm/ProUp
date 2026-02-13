@@ -30,6 +30,7 @@ import { getDocuments, getDocument, createDocument, updateDocument, deleteDocume
 import { setupSocketServer } from "./socket";
 import { getProjectTemplates } from "./routes/projectTemplates";
 import { addTaskDependency, getTaskDependencies, removeTaskDependency } from "./routes/taskDependencies";
+import { getProjectLeaderboard } from "./routes/leaderboard";
 
 export function createServer() {
   const app = express();
@@ -106,6 +107,7 @@ export function createServer() {
   app.post("/api/projects", createProject);
   app.put("/api/projects/:id", updateProject);
   app.delete("/api/projects/:id", deleteProject);
+  app.get("/api/projects/:projectId/leaderboard", getProjectLeaderboard);
 
   // Project template routes
   app.get("/api/project-templates", getProjectTemplates);

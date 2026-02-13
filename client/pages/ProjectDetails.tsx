@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
-import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText } from "lucide-react";
+import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task } from "@/components/TaskCard";
@@ -11,6 +11,7 @@ import DocumentsList from "@/components/DocumentsList";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { bumpCompletionStreak, confettiBurst, readCompletionStreak } from "@/lib/confetti";
 
 interface Project {
   id: number;
@@ -19,6 +20,15 @@ interface Project {
   ownerId: number;
   status: string;
 }
+
+type LeaderboardRow = {
+  userId: string;
+  name: string;
+  email: string | null;
+  completedToday: number;
+  completedLast7Days: number;
+  streak: number;
+};
 
 export default function ProjectDetails() {
   const { projectId } = useParams();
@@ -38,15 +48,25 @@ export default function ProjectDetails() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [streak, setStreak] = useState(() => readCompletionStreak().streak);
+
   // Fetch project and tasks from backend
   useEffect(() => {
     fetchProject();
     fetchTasks();
+    fetchLeaderboard();
     
     // Poll for updates every 10 seconds
     const interval = setInterval(fetchTasks, 10000);
+
+    const leaderInterval = setInterval(fetchLeaderboard, 30000);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(leaderInterval);
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -60,6 +80,7 @@ export default function ProjectDetails() {
         if (prev.some((t) => t.id === task.id)) return prev;
         return [...prev, task];
       });
+      fetchLeaderboard();
     };
 
     const onTaskUpdated = ({ task }: { task: Task }) => {
@@ -74,6 +95,7 @@ export default function ProjectDetails() {
 
     const onTaskDeleted = ({ taskId }: { taskId: number }) => {
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      fetchLeaderboard();
     };
 
     const onTaskReordered = ({ tasks: moved }: { tasks: Array<{ id: number; status?: any; position?: number }> }) => {
@@ -88,6 +110,7 @@ export default function ProjectDetails() {
           } as any;
         })
       );
+      fetchLeaderboard();
     };
 
     socket.on("task:created", onTaskCreated);
@@ -103,6 +126,21 @@ export default function ProjectDetails() {
       socket.off("task:reordered", onTaskReordered);
     };
   }, [projectId]);
+
+  const fetchLeaderboard = async () => {
+    if (!projectId) return;
+    try {
+      setLeaderboardLoading(true);
+      const response = await api(`/api/projects/${projectId}/leaderboard`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setLeaderboard(Array.isArray(data?.leaderboard) ? (data.leaderboard as LeaderboardRow[]) : []);
+    } catch {
+      // ignore
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  };
 
   const fetchProject = async () => {
     if (!projectId) return;
@@ -176,6 +214,7 @@ export default function ProjectDetails() {
     try {
       if (editingTask) {
         // Update existing task
+        const beforeStatus = editingTask.status;
         const response = await api(`/api/tasks/${editingTask.id}`, {
           method: 'PUT',
           body: JSON.stringify({ ...newTask, projectId: projectId ? parseInt(projectId) : null }),
@@ -184,6 +223,12 @@ export default function ProjectDetails() {
         if (response.ok) {
           const updatedTask = await response.json();
           setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+
+          if (beforeStatus !== "done" && updatedTask?.status === "done") {
+            confettiBurst();
+            setStreak(bumpCompletionStreak().streak);
+            fetchLeaderboard();
+          }
         }
       } else {
         // Create new task with projectId
@@ -195,6 +240,7 @@ export default function ProjectDetails() {
         if (response.ok) {
           const createdTask = await response.json();
           setTasks((prev) => [...prev, createdTask]);
+          fetchLeaderboard();
         }
       }
     } catch (error) {
@@ -243,6 +289,7 @@ export default function ProjectDetails() {
   const handleDrop = async (status: "todo" | "inprogress" | "done") => {
     if (draggedTask && draggedTask.status !== status) {
       try {
+        const beforeStatus = draggedTask.status;
         const updatedTask = { ...draggedTask, status };
         const response = await api(`/api/tasks/${draggedTask.id}`, {
           method: 'PUT',
@@ -252,6 +299,12 @@ export default function ProjectDetails() {
         if (response.ok) {
           const savedTask = await response.json();
           setTasks(tasks.map((t) => (t.id === draggedTask.id ? savedTask : t)));
+
+          if (beforeStatus !== "done" && savedTask?.status === "done") {
+            confettiBurst();
+            setStreak(bumpCompletionStreak().streak);
+            fetchLeaderboard();
+          }
         }
       } catch (error) {
         console.error('Error updating task status:', error);
@@ -416,6 +469,83 @@ export default function ProjectDetails() {
               <p className="text-3xl font-bold text-purple-700 dark:text-purple-300">{totalTasks}</p>
             </motion.div>
 
+        {/* Fun: streak + leaderboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <motion.div
+            className="lg:col-span-1 bg-gradient-to-br from-primary/10 via-card to-purple-500/10 rounded-2xl p-6 border border-border shadow-lg"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Completion streak</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{streak} day{streak === 1 ? "" : "s"}</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/20">
+                <Trophy className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              Complete at least one task per day to keep the streak alive.
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="lg:col-span-2 bg-card rounded-2xl p-6 border border-border shadow-lg overflow-hidden relative"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Project Leaderboard</h3>
+                  <p className="text-xs text-muted-foreground">Last 7 days (based on completed tasks)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchLeaderboard}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/50 hover:bg-secondary transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {leaderboardLoading ? (
+                <div className="text-sm text-muted-foreground">Loading leaderboard...</div>
+              ) : leaderboard.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No completions yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {leaderboard.slice(0, 5).map((row, idx) => (
+                    <div
+                      key={row.userId}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/30 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          #{idx + 1} {row.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {row.completedToday} today 
+                          {" · "}
+                          {row.streak} day streak
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-foreground">{row.completedLast7Days}</p>
+                        <p className="text-[11px] text-muted-foreground">last 7d</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
             {/* Completed */}
             <motion.div 
               className="bg-green-50 dark:bg-green-950/20 rounded-xl p-4 border border-green-200 dark:border-green-900"
@@ -495,21 +625,13 @@ export default function ProjectDetails() {
         </div>
           </>
         ) : activeTab === "team" ? (
-          /* Team Tab */
-          <div className="bg-card rounded-2xl p-6 shadow-lg border border-border">
-            {project && (
-              <ProjectMembersTab
-                projectId={project.id}
-                projectName={project.name}
-                currentUserRole={currentUserRole}
-              />
-            )}
-          </div>
+          <ProjectMembersTab
+            projectId={projectId ? parseInt(projectId) : 0}
+            projectName={project?.name ?? ""}
+            currentUserRole={currentUserRole}
+          />
         ) : (
-          /* Documents Tab */
-          <div className="bg-card rounded-2xl p-6 shadow-lg border border-border">
-            {project && <DocumentsList projectId={project.id} />}
-          </div>
+          <DocumentsList projectId={projectId ? parseInt(projectId) : 0} />
         )}
       </div>
 
