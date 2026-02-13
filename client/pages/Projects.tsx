@@ -24,6 +24,7 @@ interface Project {
   taskCount?: number;
   status?: "active" | "paused" | "completed";
   logo?: string;
+  templateId?: number;
 }
 
 const LOGO_OPTIONS = [

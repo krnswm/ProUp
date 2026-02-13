@@ -85,8 +85,20 @@ export const getProject: RequestHandler = async (req, res) => {
  */
 export const createProject: RequestHandler = async (req: AuthRequest, res) => {
   try {
-    const { name, description, color, status } = req.body;
-    const userId = req.user?.id || 1; // Fallback to user 1 for now
+    const { name, description, color, status, templateId } = req.body as {
+      name: string;
+      description?: string;
+      color?: string;
+      status?: string;
+      templateId?: number;
+    };
+
+    const userId = req.user?.id;
+    const userName = req.user?.name;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
     const project = await prisma.project.create({
       data: {
@@ -97,6 +109,46 @@ export const createProject: RequestHandler = async (req: AuthRequest, res) => {
         ownerId: userId,
       },
     });
+
+    const templateIdInt = typeof templateId === 'number' ? templateId : templateId ? parseInt(String(templateId)) : NaN;
+    if (!Number.isNaN(templateIdInt)) {
+      const template = await prisma.projectTemplate.findFirst({
+        where: { id: templateIdInt, ownerId: userId },
+        include: { tasks: { orderBy: [{ status: 'asc' }, { position: 'asc' }] } },
+      });
+
+      if (template) {
+        const today = new Date();
+        const asDate = (offset?: number | null) => {
+          if (offset === undefined || offset === null) return null;
+          const d = new Date(today);
+          d.setDate(d.getDate() + offset);
+          return d.toISOString().slice(0, 10);
+        };
+
+        // Set positions per status in the created tasks
+        const counters: Record<string, number> = { todo: 0, inprogress: 0, done: 0 };
+
+        await prisma.task.createMany({
+          data: template.tasks.map((t) => {
+            const key = String(t.status || 'todo');
+            const pos = (counters[key] ?? 0);
+            counters[key] = pos + 1;
+
+            return {
+              title: t.title,
+              description: t.description,
+              assignedUser: userName || 'Me',
+              dueDate: asDate(t.dueOffsetDays),
+              status: t.status,
+              priority: t.priority,
+              position: pos,
+              projectId: project.id,
+            } as any;
+          }),
+        });
+      }
+    }
 
     res.status(201).json(project);
   } catch (error) {
@@ -165,7 +217,8 @@ export const deleteProject: RequestHandler = async (req, res) => {
 export const getProjectMembers: RequestHandler = async (req, res) => {
   try {
     const { id } = req.params;
-    const projectId = parseInt(id);
+    const idValue = Array.isArray(id) ? id[0] : id;
+    const projectId = parseInt(idValue);
 
     const members = await prisma.projectMember.findMany({
       where: { projectId },
@@ -229,7 +282,8 @@ export const updateMemberRole: RequestHandler = async (req, res) => {
   try {
     const { id, memberId } = req.params;
     const { role } = req.body;
-    const memberIdInt = parseInt(memberId);
+    const memberIdValue = Array.isArray(memberId) ? memberId[0] : memberId;
+    const memberIdInt = parseInt(memberIdValue);
 
     if (!['Admin', 'Member', 'Viewer'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
@@ -263,7 +317,8 @@ export const updateMemberRole: RequestHandler = async (req, res) => {
 export const removeMember: RequestHandler = async (req, res) => {
   try {
     const { memberId } = req.params;
-    const memberIdInt = parseInt(memberId);
+    const memberIdValue = Array.isArray(memberId) ? memberId[0] : memberId;
+    const memberIdInt = parseInt(memberIdValue);
 
     await prisma.projectMember.delete({
       where: { id: memberIdInt },
@@ -287,7 +342,8 @@ export const removeMember: RequestHandler = async (req, res) => {
 export const inviteMember: RequestHandler = async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const projectId = parseInt(id);
+    const idValue = Array.isArray(id) ? id[0] : id;
+    const projectId = parseInt(idValue);
     const { email, role } = req.body;
     const userId = req.user?.id || 1; // Fallback to user 1 for now
 
@@ -337,7 +393,8 @@ export const inviteMember: RequestHandler = async (req: AuthRequest, res) => {
 export const getProjectInvitations: RequestHandler = async (req, res) => {
   try {
     const { id } = req.params;
-    const projectId = parseInt(id);
+    const idValue = Array.isArray(id) ? id[0] : id;
+    const projectId = parseInt(idValue);
 
     const invitations = await invitationService.getProjectInvitations(projectId);
 
@@ -357,7 +414,8 @@ export const joinProject: RequestHandler = async (req: AuthRequest, res) => {
     const { token } = req.params;
     const userId = req.user?.id || 1; // Fallback to user 1 for now
 
-    const result = await invitationService.acceptInvitation(token, userId);
+    const tokenValue = Array.isArray(token) ? token[0] : token;
+    const result = await invitationService.acceptInvitation(tokenValue, userId);
 
     res.json({
       message: 'Successfully joined project',
@@ -380,7 +438,8 @@ export const joinProject: RequestHandler = async (req: AuthRequest, res) => {
 export const cancelInvitation: RequestHandler = async (req, res) => {
   try {
     const { invitationId } = req.params;
-    const invitationIdInt = parseInt(invitationId);
+    const invitationIdValue = Array.isArray(invitationId) ? invitationId[0] : invitationId;
+    const invitationIdInt = parseInt(invitationIdValue);
 
     await invitationService.cancelInvitation(invitationIdInt);
 

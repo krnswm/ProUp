@@ -28,6 +28,7 @@ import { register, login, forgotPassword, resetPassword, getCurrentUser, logout,
 import { getWhiteboard, saveWhiteboard } from "./routes/whiteboard";
 import { getDocuments, getDocument, createDocument, updateDocument, deleteDocument } from "./routes/documents";
 import { setupSocketServer } from "./socket";
+import { getProjectTemplates } from "./routes/projectTemplates";
 
 export function createServer() {
   const app = express();
@@ -99,6 +100,9 @@ export function createServer() {
   app.post("/api/projects", createProject);
   app.put("/api/projects/:id", updateProject);
   app.delete("/api/projects/:id", deleteProject);
+
+  // Project template routes
+  app.get("/api/project-templates", getProjectTemplates);
 
   // Project member routes
   app.get("/api/projects/:id/members", getProjectMembers);

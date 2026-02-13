@@ -26,6 +26,7 @@ model User {
   documents     Document[]
   notifications Notification[]
   comments      Comment[]
+  templates     ProjectTemplate[]
 }
 
 // Project model - represents a project that contains tasks
@@ -48,6 +49,34 @@ model Project {
   documents   Document[]
   
   @@index([ownerId])
+}
+
+model ProjectTemplate {
+  id          Int                   @id @default(autoincrement())
+  name        String
+  description String?
+  ownerId     Int
+  owner       User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tasks       ProjectTemplateTask[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([ownerId])
+  @@unique([ownerId, name])
+}
+
+model ProjectTemplateTask {
+  id            Int             @id @default(autoincrement())
+  templateId    Int
+  template      ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  status        String          @default("todo")
+  priority      String          @default("medium")
+  dueOffsetDays Int?
+  position      Int             @default(0)
+
+  @@index([templateId])
 }
 
 // Whiteboard model - stores canvas state for real-time collaboration

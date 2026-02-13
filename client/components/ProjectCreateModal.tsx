@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, AlertCircle } from "lucide-react";
+import { api } from "@/lib/api";
 
 interface Logo {
   icon: any;
@@ -13,7 +14,14 @@ interface Project {
   taskCount?: number;
   status?: "active" | "paused" | "completed";
   logo?: string;
+  templateId?: number;
 }
+
+type ProjectTemplate = {
+  id: number;
+  name: string;
+  description: string | null;
+};
 
 interface ProjectCreateModalProps {
   isOpen: boolean;
@@ -36,6 +44,26 @@ export default function ProjectCreateModal({
   const [logo, setLogo] = useState("Folder");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
+  const [templateId, setTemplateId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadTemplates = async () => {
+      try {
+        const response = await api("/api/project-templates");
+        if (!response.ok) return;
+        const data = (await response.json()) as ProjectTemplate[];
+        setTemplates(Array.isArray(data) ? data : []);
+      } catch {
+        // ignore
+      }
+    };
+
+    loadTemplates();
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +93,7 @@ export default function ProjectCreateModal({
         description: description.trim(),
         status,
         logo,
+        templateId: templateId ?? undefined,
         taskCount: 0,
       });
       // Reset form
@@ -72,6 +101,7 @@ export default function ProjectCreateModal({
       setDescription("");
       setStatus("active");
       setLogo("Folder");
+      setTemplateId(null);
       setIsLoading(false);
     }, 500);
   };
@@ -190,6 +220,36 @@ export default function ProjectCreateModal({
               <option value="paused">Paused</option>
               <option value="completed">Completed</option>
             </select>
+          </div>
+
+          {/* Template */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Template</label>
+            <select
+              value={templateId ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (!raw) {
+                  setTemplateId(null);
+                  return;
+                }
+                const id = parseInt(raw);
+                setTemplateId(Number.isNaN(id) ? null : id);
+              }}
+              className="w-full px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">None</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            {templateId !== null && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {templates.find((t) => t.id === templateId)?.description || "Template selected"}
+              </p>
+            )}
           </div>
 
           {/* Buttons */}
