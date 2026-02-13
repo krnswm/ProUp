@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ReactGrid, Column, Row, CellChange, CellStyle } from "@silevis/reactgrid";
+import type { DefaultCellTypes, Id, TextCell, HeaderCell } from "@silevis/reactgrid";
 import "@silevis/reactgrid/styles.css";
 import {  ArrowLeft, Save, Loader2, Bold, Italic, Palette, Plus, Minus, Calculator, Download } from "lucide-react";
 import { motion } from "framer-motion";
@@ -22,15 +23,15 @@ interface CellData {
 
 export default function SpreadsheetEditor() {
   const { projectId, documentId } = useParams();
-  const [document, setDocument] = useState<Document | null>(null);
+  const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [documentName, setDocumentName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<Row<DefaultCellTypes>[]>([]);
   const [columns, setColumns] = useState<Column[]>([]);
-  const [selectedCell, setSelectedCell] = useState<{ rowId: any; columnId: string } | null>(null);
+  const [selectedCell, setSelectedCell] = useState<{ rowId: Id; columnId: Id } | null>(null);
   const [showFormatMenu, setShowFormatMenu] = useState(false);
   const [cellStyles, setCellStyles] = useState<Map<string, CellStyle>>(new Map());
 
@@ -47,26 +48,25 @@ export default function SpreadsheetEditor() {
       })),
     ];
 
-    const headerRow: Row = {
+    const headerRow: Row<DefaultCellTypes> = {
       rowId: "header",
       cells: [
-        { type: "header", text: "" },
+        { type: "header", text: "" } as HeaderCell,
         ...Array.from({ length: numCols }, (_, i) => ({
           type: "header",
           text: String.fromCharCode(65 + i),
-        })),
+        })) as HeaderCell[],
       ],
     };
 
-    const dataRows: Row[] = Array.from({ length: numRows }, (_, i) => ({
+    const dataRows: Row<DefaultCellTypes>[] = Array.from({ length: numRows }, (_, i) => ({
       rowId: i,
       cells: [
-        { type: "header", text: (i + 1).toString() },
-        ...Array.from({ length: numCols }, (_, j) => ({
+        { type: "header", text: (i + 1).toString() } as HeaderCell,
+        ...Array.from({ length: numCols }, () => ({
           type: "text",
           text: "",
-          value: "",
-        })),
+        })) as TextCell[],
       ],
     }));
 
@@ -83,7 +83,7 @@ export default function SpreadsheetEditor() {
         const response = await api(`/api/documents/file/${documentId}`);
         if (response.ok) {
           const data = await response.json();
-          setDocument(data);
+          setDoc(data);
           setDocumentName(data.name);
 
           // Load spreadsheet data
@@ -125,21 +125,21 @@ export default function SpreadsheetEditor() {
       })),
     ];
 
-    const headerRow: Row = {
+    const headerRow: Row<DefaultCellTypes> = {
       rowId: "header",
       cells: [
-        { type: "header", text: "" },
+        { type: "header", text: "" } as HeaderCell,
         ...Array.from({ length: numCols }, (_, i) => ({
           type: "header",
           text: String.fromCharCode(65 + i),
-        })),
+        })) as HeaderCell[],
       ],
     };
 
-    const dataRows: Row[] = Array.from({ length: numRows }, (_, i) => ({
+    const dataRows: Row<DefaultCellTypes>[] = Array.from({ length: numRows }, (_, i) => ({
       rowId: i,
       cells: [
-        { type: "header", text: (i + 1).toString() },
+        { type: "header", text: (i + 1).toString() } as HeaderCell,
         ...Array.from({ length: numCols }, (_, j) => {
           const col = String.fromCharCode(65 + j);
           const cellKey = `${col}${i + 1}`;
@@ -147,9 +147,8 @@ export default function SpreadsheetEditor() {
           return {
             type: "text",
             text: cellValue,
-            value: cellValue,
-          };
-        }),
+          } as TextCell;
+        }) as TextCell[],
       ],
     }));
 
@@ -173,7 +172,7 @@ export default function SpreadsheetEditor() {
             newRows[rowIndex] = {
               ...newRows[rowIndex],
               cells: newRows[rowIndex].cells.map((cell, idx) => 
-                idx === cellIndex ? { ...cell, ...change.newCell } : cell
+                idx === cellIndex ? ({ ...cell, ...change.newCell } as any) : cell
               )
             };
           }
@@ -202,7 +201,7 @@ export default function SpreadsheetEditor() {
           newRows[rowIndex] = {
             ...newRows[rowIndex],
             cells: newRows[rowIndex].cells.map((cell, idx) => 
-              idx === cellIndex ? { ...cell, text: formula, value: formula } : cell
+              idx === cellIndex ? ({ ...cell, text: formula } as any) : cell
             )
           };
         }
@@ -218,15 +217,14 @@ export default function SpreadsheetEditor() {
     const numCols = columns.length - 1;
     const newRowId = rows.length - 1; // Skip header
     
-    const newRow: Row = {
+    const newRow: Row<DefaultCellTypes> = {
       rowId: newRowId,
       cells: [
-        { type: "header", text: (newRowId + 1).toString() },
+        { type: "header", text: (newRowId + 1).toString() } as HeaderCell,
         ...Array.from({ length: numCols }, () => ({
           type: "text",
           text: "",
-          value: "",
-        })),
+        })) as TextCell[],
       ],
     };
 
@@ -284,15 +282,15 @@ export default function SpreadsheetEditor() {
     
     const csvContent = csvRows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
+    const link = window.document.createElement("a");
     const url = URL.createObjectURL(blob);
     
     link.setAttribute("href", url);
     link.setAttribute("download", `${documentName || "spreadsheet"}.csv`);
     link.style.visibility = "hidden";
-    document.body.appendChild(link);
+    window.document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    window.document.body.removeChild(link);
   };
 
   // Debounced save
@@ -390,7 +388,7 @@ export default function SpreadsheetEditor() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") updateDocumentName();
                   if (e.key === "Escape") {
-                    setDocumentName(document?.name || "");
+                    setDocumentName(doc?.name || "");
                     setIsEditingName(false);
                   }
                 }}
@@ -546,7 +544,7 @@ export default function SpreadsheetEditor() {
             columns={columns}
             onCellsChanged={handleChanges}
             onFocusLocationChanged={(location) => {
-              if (location.rowId && location.columnId) {
+              if (location.rowId !== undefined && location.rowId !== null && location.columnId !== undefined && location.columnId !== null) {
                 setSelectedCell({ rowId: location.rowId, columnId: location.columnId });
               }
             }}

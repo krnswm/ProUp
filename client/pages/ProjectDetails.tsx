@@ -469,6 +469,66 @@ export default function ProjectDetails() {
               <p className="text-3xl font-bold text-purple-700 dark:text-purple-300">{totalTasks}</p>
             </motion.div>
 
+            {/* Completed */}
+            <motion.div 
+              className="bg-green-50 dark:bg-green-950/20 rounded-xl p-4 border border-green-200 dark:border-green-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-green-600 dark:text-green-400">Completed</p>
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <p className="text-3xl font-bold text-green-700 dark:text-green-300">{completedTasks}</p>
+            </motion.div>
+
+            {/* In Progress */}
+            <motion.div 
+              className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">In Progress</p>
+                <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">{inProgressTasks}</p>
+            </motion.div>
+
+            {/* To Do */}
+            <motion.div 
+              className="bg-orange-50 dark:bg-orange-950/20 rounded-xl p-4 border border-orange-200 dark:border-orange-900"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">To Do</p>
+                <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">{todoTasks}</p>
+            </motion.div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-foreground">Overall Completion</span>
+              <span className="font-bold text-primary">{completionPercentage}%</span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary to-purple-600 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${completionPercentage}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+        </motion.div>
+
         {/* Fun: streak + leaderboard */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <motion.div
@@ -529,7 +589,7 @@ export default function ProjectDetails() {
                           #{idx + 1} {row.name}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {row.completedToday} today 
+                          {row.completedToday} today
                           {" · "}
                           {row.streak} day streak
                         </p>
@@ -545,66 +605,6 @@ export default function ProjectDetails() {
             </div>
           </motion.div>
         </div>
-
-            {/* Completed */}
-            <motion.div 
-              className="bg-green-50 dark:bg-green-950/20 rounded-xl p-4 border border-green-200 dark:border-green-900"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-green-600 dark:text-green-400">Completed</p>
-                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <p className="text-3xl font-bold text-green-700 dark:text-green-300">{completedTasks}</p>
-            </motion.div>
-
-            {/* In Progress */}
-            <motion.div 
-              className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-900"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">In Progress</p>
-                <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">{inProgressTasks}</p>
-            </motion.div>
-
-            {/* To Do */}
-            <motion.div 
-              className="bg-orange-50 dark:bg-orange-950/20 rounded-xl p-4 border border-orange-200 dark:border-orange-900"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">To Do</p>
-                <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">{todoTasks}</p>
-            </motion.div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-foreground">Overall Completion</span>
-              <span className="font-bold text-primary">{completionPercentage}%</span>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-primary to-purple-600 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${completionPercentage}%` }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-              />
-            </div>
-          </div>
-        </motion.div>
 
         {/* Add Task Button */}
         <div className="mb-6 flex justify-end">
