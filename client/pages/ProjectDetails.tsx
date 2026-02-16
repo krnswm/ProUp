@@ -17,6 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import AiTaskSuggestions from "@/components/AiTaskSuggestions";
 import TimeMachine from "@/components/TimeMachine";
+import TaskTemplates from "@/components/TaskTemplates";
+import KanbanSwimlanes from "@/components/KanbanSwimlanes";
+import LivePresence from "@/components/LivePresence";
+import type { TaskTemplate } from "@/lib/taskTemplates";
 
 interface Project {
   id: number;
@@ -74,6 +78,12 @@ export default function ProjectDetails() {
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [projectLabels, setProjectLabels] = useState<TaskLabel[]>([]);
+
+  // View mode: standard kanban vs swimlanes
+  type ViewMode = "kanban" | "swimlane";
+  type SwimGroupBy = "assignee" | "priority" | "label";
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [swimGroupBy, setSwimGroupBy] = useState<SwimGroupBy>("assignee");
 
   // Fetch project labels
   useEffect(() => {
@@ -812,8 +822,57 @@ export default function ProjectDetails() {
 
             <div className="flex-1" />
 
+            {/* Live Presence */}
+            {projectId && (
+              <LivePresence projectId={parseInt(projectId)} />
+            )}
+
             {projectId && (
               <TimeMachine projectId={parseInt(projectId)} tasks={tasks} />
+            )}
+
+            <TaskTemplates
+              onUseTemplate={(template: TaskTemplate) => {
+                const due = new Date();
+                due.setDate(due.getDate() + template.estimatedDays);
+                setEditingTask(undefined);
+                setIsDrawerOpen(true);
+                // Pre-fill via a short timeout so drawer resets first
+                setTimeout(() => {
+                  const titleInput = document.querySelector<HTMLInputElement>('[data-field="title"]');
+                  if (titleInput) titleInput.value = template.title;
+                }, 100);
+              }}
+            />
+
+            {/* View mode toggle */}
+            <div className="flex items-center border border-border rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                className={`px-3 py-2 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+              >
+                Board
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("swimlane")}
+                className={`px-3 py-2 text-xs font-medium transition-colors ${viewMode === "swimlane" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+              >
+                Swimlanes
+              </button>
+            </div>
+
+            {viewMode === "swimlane" && (
+              <select
+                value={swimGroupBy}
+                onChange={(e) => setSwimGroupBy(e.target.value as SwimGroupBy)}
+                className="px-2 py-2 text-xs border border-border rounded-lg bg-input text-foreground"
+              >
+                <option value="assignee">By Assignee</option>
+                <option value="priority">By Priority</option>
+                <option value="label">By Label</option>
+              </select>
             )}
 
             <AiTaskSuggestions
@@ -913,12 +972,23 @@ export default function ProjectDetails() {
           )}
         </div>
 
-        {/* Kanban Board */}
-        <div className="flex gap-6">
-          <KanbanColumn title="To Do" tasks={getTodoTasks()} status="todo" />
-          <KanbanColumn title="In Progress" tasks={getInProgressTasks()} status="inprogress" />
-          <KanbanColumn title="Done" tasks={getDoneTasks()} status="done" />
-        </div>
+        {/* Kanban Board / Swimlanes */}
+        {viewMode === "kanban" ? (
+          <div className="flex gap-6">
+            <KanbanColumn title="To Do" tasks={getTodoTasks()} status="todo" />
+            <KanbanColumn title="In Progress" tasks={getInProgressTasks()} status="inprogress" />
+            <KanbanColumn title="Done" tasks={getDoneTasks()} status="done" />
+          </div>
+        ) : (
+          <KanbanSwimlanes
+            tasks={filteredTasks}
+            groupBy={swimGroupBy}
+            onOpen={(task) => { setEditingTask(task); setDrawerReadOnly(true); setIsDrawerOpen(true); }}
+            onEdit={(task) => { setEditingTask(task); setDrawerReadOnly(false); setIsDrawerOpen(true); }}
+            onDelete={handleDeleteTask}
+            onHistory={(task) => { setHistoryTask(task); setIsHistoryModalOpen(true); }}
+          />
+        )}
           </>
         ) : activeTab === "team" ? (
           <ProjectMembersTab

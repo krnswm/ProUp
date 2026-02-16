@@ -26,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import WeeklyRecap from "./pages/WeeklyRecap";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AmbientPlayer from "@/components/AmbientPlayer";
+import CommandPalette from "@/components/CommandPalette";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +140,7 @@ const App = () => {
             </Routes>
           </BrowserRouter>
           <AmbientPlayer />
+          <CommandPalette />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
