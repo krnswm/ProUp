@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import { createServer as createHttpServer } from 'http';
 import { authenticate } from "./middleware/authenticate";
-import { handleDemo } from "./routes/demo";
 import { getTasks, getMyTasks, getProjectBoard, reorderTasks, getTask, createTask, updateTask, deleteTask } from "./routes/tasks";
 import { getActivityLogs } from "./routes/activityLogs";
 import { getCalendarTasks, getFilteredCalendarTasks } from "./routes/calendar";
@@ -45,8 +44,6 @@ export function createServer() {
     const ping = process.env.PING_MESSAGE ?? "ping";
     res.json({ message: ping });
   });
-
-  app.get("/api/demo", handleDemo);
 
   // Auth routes (public - must be before authentication middleware)
   app.post("/api/auth/register", register);
