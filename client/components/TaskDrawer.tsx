@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Calendar, User, Flag, CheckCircle, Pencil, Trash2 } from "lucide-react";
+import { X, Calendar, User, Flag, CheckCircle, Pencil, Trash2, Tag, Paperclip, Download, Upload, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Task } from "./TaskCard";
+import { Task, TaskLabel } from "./TaskCard";
 
 interface TaskDrawerProps {
   open: boolean;
@@ -259,6 +259,24 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingBody, setEditingBody] = useState("");
 
+  // Labels state
+  const [taskLabels, setTaskLabels] = useState<TaskLabel[]>([]);
+  const [projectLabels, setProjectLabels] = useState<TaskLabel[]>([]);
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState("#3b82f6");
+
+  // Attachments state
+  type AttachmentItem = {
+    id: number;
+    taskId: number;
+    filename: string;
+    mimetype: string;
+    size: number;
+    createdAt: string;
+  };
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
   const canSave = useMemo(() => {
     return title.trim().length > 0 && assignedUser.trim().length > 0 && dueDate.trim().length > 0;
   }, [title, assignedUser, dueDate]);
@@ -411,6 +429,122 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
     setStatus("todo");
     setPriority("medium");
   }, [open, task]);
+
+  // Fetch labels for this task and project
+  useEffect(() => {
+    if (!open || !task?.id) { setTaskLabels([]); setAttachments([]); return; }
+
+    const fetchTaskLabels = async () => {
+      try {
+        const res = await api(`/api/tasks/${task.id}/labels`);
+        if (res.ok) setTaskLabels(await res.json());
+      } catch { /* ignore */ }
+    };
+
+    const fetchAttachments = async () => {
+      try {
+        const res = await api(`/api/tasks/${task.id}/attachments`);
+        if (res.ok) setAttachments(await res.json());
+      } catch { /* ignore */ }
+    };
+
+    fetchTaskLabels();
+    fetchAttachments();
+  }, [open, task?.id]);
+
+  useEffect(() => {
+    if (!open || !task?.projectId) { setProjectLabels([]); return; }
+    const fetchProjectLabels = async () => {
+      try {
+        const res = await api(`/api/projects/${task.projectId}/labels`);
+        if (res.ok) setProjectLabels(await res.json());
+      } catch { /* ignore */ }
+    };
+    fetchProjectLabels();
+  }, [open, task?.projectId]);
+
+  const handleAddLabel = async (labelId: number) => {
+    if (!task?.id) return;
+    try {
+      const res = await api(`/api/tasks/${task.id}/labels`, {
+        method: "POST",
+        body: JSON.stringify({ labelId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.label) {
+          setTaskLabels((prev) => prev.some((l) => l.id === data.label.id) ? prev : [...prev, data.label]);
+        }
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleRemoveLabel = async (labelId: number) => {
+    if (!task?.id) return;
+    try {
+      await api(`/api/tasks/${task.id}/labels/${labelId}`, { method: "DELETE" });
+      setTaskLabels((prev) => prev.filter((l) => l.id !== labelId));
+    } catch { /* ignore */ }
+  };
+
+  const handleCreateLabel = async () => {
+    if (!task?.projectId || !newLabelName.trim()) return;
+    try {
+      const res = await api(`/api/projects/${task.projectId}/labels`, {
+        method: "POST",
+        body: JSON.stringify({ name: newLabelName.trim(), color: newLabelColor }),
+      });
+      if (res.ok) {
+        const label = await res.json();
+        setProjectLabels((prev) => [...prev, label]);
+        setNewLabelName("");
+        setNewLabelColor("#3b82f6");
+        // Auto-assign to task
+        await handleAddLabel(label.id);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!task?.id) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File too large. Maximum size is 5MB.");
+      return;
+    }
+    setUploadingFile(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(",")[1];
+        const res = await api(`/api/tasks/${task!.id}/attachments`, {
+          method: "POST",
+          body: JSON.stringify({ filename: file.name, mimetype: file.type, data: base64 }),
+        });
+        if (res.ok) {
+          const att = await res.json();
+          setAttachments((prev) => [att, ...prev]);
+        }
+        setUploadingFile(false);
+      };
+      reader.onerror = () => setUploadingFile(false);
+      reader.readAsDataURL(file);
+    } catch {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    try {
+      await api(`/api/attachments/${attachmentId}`, { method: "DELETE" });
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    } catch { /* ignore */ }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const handleSave = () => {
     if (readOnly) return;
@@ -927,6 +1061,163 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Labels Section */}
+            {isEdit && task?.projectId && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-muted-foreground" />
+                  <label className="text-sm font-medium text-foreground">Labels</label>
+                </div>
+
+                {/* Current labels */}
+                {taskLabels.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {taskLabels.map((l) => (
+                      <span
+                        key={l.id}
+                        className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full text-white"
+                        style={{ backgroundColor: l.color }}
+                      >
+                        {l.name}
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLabel(l.id)}
+                            className="hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add existing label */}
+                {!readOnly && (
+                  <div className="space-y-2">
+                    {projectLabels.filter((pl) => !taskLabels.some((tl) => tl.id === pl.id)).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {projectLabels
+                          .filter((pl) => !taskLabels.some((tl) => tl.id === pl.id))
+                          .map((l) => (
+                            <button
+                              key={l.id}
+                              type="button"
+                              onClick={() => handleAddLabel(l.id)}
+                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                              {l.name}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Create new label */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newLabelColor}
+                        onChange={(e) => setNewLabelColor(e.target.value)}
+                        className="w-7 h-7 rounded border border-border cursor-pointer"
+                      />
+                      <Input
+                        value={newLabelName}
+                        onChange={(e) => setNewLabelName(e.target.value)}
+                        placeholder="New label name"
+                        className="flex-1 h-8 text-sm"
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateLabel(); } }}
+                      />
+                      <Button type="button" size="sm" onClick={handleCreateLabel} disabled={!newLabelName.trim()}>
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Attachments Section */}
+            {isEdit && task?.id && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-muted-foreground" />
+                  <label className="text-sm font-medium text-foreground">Attachments</label>
+                </div>
+
+                {/* Upload area */}
+                {!readOnly && (
+                  <div
+                    className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const files = e.dataTransfer.files;
+                      if (files.length > 0) handleFileUpload(files[0]);
+                    }}
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.onchange = () => {
+                        if (input.files && input.files.length > 0) handleFileUpload(input.files[0]);
+                      };
+                      input.click();
+                    }}
+                  >
+                    {uploadingFile ? (
+                      <p className="text-sm text-muted-foreground">Uploading...</p>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload className="w-5 h-5 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Drop a file here or <span className="text-primary font-medium">browse</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">Max 5MB</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Attachment list */}
+                {attachments.length > 0 && (
+                  <div className="space-y-2">
+                    {attachments.map((att) => (
+                      <div key={att.id} className="flex items-center justify-between gap-3 bg-secondary/30 border border-border rounded-lg px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground truncate">{att.filename}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={`/api/attachments/${att.id}/download`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                            title="Download"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttachment(att.id)}
+                              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

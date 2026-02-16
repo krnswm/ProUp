@@ -250,21 +250,30 @@ export const getProjectBoard: RequestHandler = async (req: AuthRequest, res) => 
       return res.status(404).json({ error: 'Project not found' });
     }
 
+    const includeLabels = { labels: { include: { label: true } } };
     let tasks;
     try {
       tasks = await prisma.task.findMany({
         where: { project: { is: { id: projectIdInt } } },
+        include: includeLabels,
         orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
       } as any);
     } catch (error) {
       if (!isUnknownPositionError(error)) throw error;
       tasks = await prisma.task.findMany({
         where: { project: { is: { id: projectIdInt } } },
+        include: includeLabels,
         orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
       } as any);
     }
 
-    res.json({ projectId: projectIdInt, tasks });
+    // Flatten labels for the frontend
+    const tasksWithLabels = (tasks as any[]).map((t: any) => ({
+      ...t,
+      labels: Array.isArray(t.labels) ? t.labels.map((tl: any) => tl.label) : [],
+    }));
+
+    res.json({ projectId: projectIdInt, tasks: tasksWithLabels });
   } catch (error) {
     console.error('Error fetching project board:', error);
     res.status(500).json({ error: 'Failed to fetch project board' });

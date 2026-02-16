@@ -1,7 +1,8 @@
 import MainLayout from "@/components/MainLayout";
-import { Folder, CheckCircle, Clock, ListTodo, TrendingUp } from "lucide-react";
+import { Folder, CheckCircle, Clock, ListTodo, TrendingUp, AlertTriangle, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 
 interface DashboardAnalytics {
@@ -27,6 +28,18 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  type OverdueTask = {
+    id: number;
+    title: string;
+    assignedUser: string;
+    dueDate: string;
+    status: string;
+    priority: string;
+    projectId: number | null;
+    projectName?: string;
+  };
+  const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
+
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
@@ -45,8 +58,29 @@ export default function Dashboard() {
       }
     };
 
+    const fetchOverdue = async () => {
+      try {
+        const res = await api('/api/tasks/my');
+        if (res.ok) {
+          const data = await res.json();
+          const tasks = Array.isArray(data) ? data : [];
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const overdue = tasks.filter((t: any) => {
+            if (t.status === 'done' || !t.dueDate) return false;
+            const due = new Date(t.dueDate);
+            if (Number.isNaN(due.getTime())) return false;
+            due.setHours(0, 0, 0, 0);
+            return due < today;
+          });
+          setOverdueTasks(overdue);
+        }
+      } catch { /* ignore */ }
+    };
+
     // Fetch immediately
     fetchAnalytics();
+    fetchOverdue();
 
     // Set up polling to refresh data every 10 seconds
     const interval = setInterval(fetchAnalytics, 10000);
@@ -212,6 +246,46 @@ export default function Dashboard() {
               );
             })}
           </div>
+
+          {/* Overdue Tasks Alert */}
+          {overdueTasks.length > 0 && (
+            <motion.div
+              className="mb-8 sm:mb-10 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-2xl p-5 sm:p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <h2 className="text-lg font-bold text-red-700 dark:text-red-400">
+                  {overdueTasks.length} Overdue Task{overdueTasks.length === 1 ? '' : 's'}
+                </h2>
+              </div>
+              <div className="space-y-2">
+                {overdueTasks.slice(0, 5).map((t) => (
+                  <Link
+                    key={t.id}
+                    to={t.projectId ? `/project/${t.projectId}?task=${t.id}` : '/my-tasks'}
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-card border border-red-100 dark:border-red-900/50 rounded-xl hover:shadow-md transition-all group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{t.title}</p>
+                      <p className="text-xs text-muted-foreground">{t.assignedUser}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span className="text-xs font-semibold whitespace-nowrap">{t.dueDate}</span>
+                    </div>
+                  </Link>
+                ))}
+                {overdueTasks.length > 5 && (
+                  <p className="text-xs text-red-600 dark:text-red-400 text-center pt-1">
+                    +{overdueTasks.length - 5} more overdue tasks
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Progress Section */}
           <motion.div 

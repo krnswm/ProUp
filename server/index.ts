@@ -30,14 +30,16 @@ import { setupSocketServer } from "./socket";
 import { getProjectTemplates } from "./routes/projectTemplates";
 import { addTaskDependency, getTaskDependencies, removeTaskDependency } from "./routes/taskDependencies";
 import { getProjectLeaderboard } from "./routes/leaderboard";
+import { getProjectLabels, createLabel, updateLabel, deleteLabel, addLabelToTask, removeLabelFromTask, getTaskLabels } from "./routes/labels";
+import { getTaskAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from "./routes/attachments";
 
 export function createServer() {
   const app = express();
 
   // Middleware
   app.use(cors());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   // Public routes (no authentication required)
   app.get("/api/ping", (_req, res) => {
@@ -119,6 +121,21 @@ export function createServer() {
   app.get("/api/projects/:id/invitations", getProjectInvitations);
   app.post("/api/projects/join/:token", joinProject);
   app.delete("/api/projects/:id/invitations/:invitationId", cancelInvitation);
+
+  // Label routes
+  app.get("/api/projects/:projectId/labels", getProjectLabels);
+  app.post("/api/projects/:projectId/labels", createLabel);
+  app.put("/api/projects/:projectId/labels/:labelId", updateLabel);
+  app.delete("/api/projects/:projectId/labels/:labelId", deleteLabel);
+  app.get("/api/tasks/:taskId/labels", getTaskLabels);
+  app.post("/api/tasks/:taskId/labels", addLabelToTask);
+  app.delete("/api/tasks/:taskId/labels/:labelId", removeLabelFromTask);
+
+  // Attachment routes
+  app.get("/api/tasks/:taskId/attachments", getTaskAttachments);
+  app.post("/api/tasks/:taskId/attachments", uploadAttachment);
+  app.get("/api/attachments/:attachmentId/download", downloadAttachment);
+  app.delete("/api/attachments/:attachmentId", deleteAttachment);
 
   // Whiteboard routes
   app.get("/api/whiteboard/:projectId", getWhiteboard);

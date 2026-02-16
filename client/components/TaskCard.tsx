@@ -1,5 +1,12 @@
-import { Edit2, Trash2, Calendar, History } from "lucide-react";
+import { Edit2, Trash2, Calendar, History, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
+
+export interface TaskLabel {
+  id: number;
+  name: string;
+  color: string;
+  projectId: number;
+}
 
 export interface Task {
   id: number;
@@ -11,6 +18,7 @@ export interface Task {
   priority: "low" | "medium" | "high";
   projectId?: number | null;
   position?: number;
+  labels?: TaskLabel[];
 }
 
 interface TaskCardProps {
@@ -22,6 +30,16 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: TaskCardProps) {
+  const isOverdue = (() => {
+    if (task.status === "done" || !task.dueDate) return false;
+    const due = new Date(task.dueDate);
+    if (Number.isNaN(due.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
+  })();
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case "todo":
@@ -67,7 +85,7 @@ export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: 
 
   return (
     <motion.div 
-      className="group relative bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 select-none overflow-hidden"
+      className={`group relative bg-card/80 backdrop-blur-sm border rounded-xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 select-none overflow-hidden ${isOverdue ? "border-red-400 bg-red-50/30 dark:bg-red-950/10" : "border-border"}`}
       style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -78,6 +96,29 @@ export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: 
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       
       <div className="relative z-10">
+        {/* Overdue banner */}
+        {isOverdue && (
+          <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-semibold">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Overdue
+          </div>
+        )}
+
+        {/* Labels */}
+        {task.labels && task.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {task.labels.map((label) => (
+              <span
+                key={label.id}
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: label.color }}
+              >
+                {label.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Title */}
         <h3 className="font-semibold text-foreground mb-3 line-clamp-2 group-hover:text-primary transition-colors">
           {task.title}
@@ -91,8 +132,8 @@ export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: 
 
         {/* Due Date */}
         <div className="mb-3 flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="text-xs text-muted-foreground">{task.dueDate || "—"}</span>
+          <Calendar className={`w-4 h-4 transition-colors ${isOverdue ? "text-red-500" : "text-muted-foreground group-hover:text-primary"}`} />
+          <span className={`text-xs ${isOverdue ? "text-red-600 dark:text-red-400 font-semibold" : "text-muted-foreground"}`}>{task.dueDate || "—"}</span>
         </div>
 
         {/* Priority Badge */}

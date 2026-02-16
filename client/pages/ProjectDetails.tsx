@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
-import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText, Trophy } from "lucide-react";
+import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText, Trophy, Search, Filter, AlertTriangle, X } from "lucide-react";
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
-import TaskCard, { Task } from "@/components/TaskCard";
+import TaskCard, { Task, TaskLabel } from "@/components/TaskCard";
 import TaskDrawer from "@/components/TaskDrawer";
 import ActivityLogModal from "@/components/ActivityLogModal";
 import ProjectMembersTab from "@/components/ProjectMembersTab";
@@ -63,6 +63,30 @@ export default function ProjectDetails() {
       return [];
     }
   });
+
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterAssignee, setFilterAssignee] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+  const [filterLabelId, setFilterLabelId] = useState("");
+  const [filterOverdue, setFilterOverdue] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [projectLabels, setProjectLabels] = useState<TaskLabel[]>([]);
+
+  // Fetch project labels
+  useEffect(() => {
+    if (!projectId) return;
+    const fetchLabels = async () => {
+      try {
+        const response = await api(`/api/projects/${projectId}/labels`);
+        if (response.ok) {
+          const data = await response.json();
+          setProjectLabels(Array.isArray(data) ? data : []);
+        }
+      } catch { /* ignore */ }
+    };
+    fetchLabels();
+  }, [projectId]);
 
   // Fetch project and tasks from backend
   useEffect(() => {
@@ -344,15 +368,91 @@ export default function ProjectDetails() {
     setDragOverColumn(null);
   };
 
-  const getTodoTasks = () => tasks.filter((t) => t.status === "todo");
-  const getInProgressTasks = () => tasks.filter((t) => t.status === "inprogress");
-  const getDoneTasks = () => tasks.filter((t) => t.status === "done");
+  // Filtered tasks
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
 
-  // Calculate task statistics
+    // Text search
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          (t.description && t.description.toLowerCase().includes(q)) ||
+          t.assignedUser.toLowerCase().includes(q)
+      );
+    }
+
+    // Assignee filter
+    if (filterAssignee) {
+      result = result.filter((t) => t.assignedUser === filterAssignee);
+    }
+
+    // Priority filter
+    if (filterPriority) {
+      result = result.filter((t) => t.priority === filterPriority);
+    }
+
+    // Label filter
+    if (filterLabelId) {
+      const lid = parseInt(filterLabelId);
+      result = result.filter((t) => t.labels?.some((l) => l.id === lid));
+    }
+
+    // Overdue filter
+    if (filterOverdue) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      result = result.filter((t) => {
+        if (t.status === "done" || !t.dueDate) return false;
+        const due = new Date(t.dueDate);
+        if (Number.isNaN(due.getTime())) return false;
+        due.setHours(0, 0, 0, 0);
+        return due < today;
+      });
+    }
+
+    return result;
+  }, [tasks, searchQuery, filterAssignee, filterPriority, filterLabelId, filterOverdue]);
+
+  // Unique assignees for filter dropdown
+  const uniqueAssignees = useMemo(() => {
+    const set = new Set(tasks.map((t) => t.assignedUser).filter(Boolean));
+    return Array.from(set).sort();
+  }, [tasks]);
+
+  const hasActiveFilters = searchQuery || filterAssignee || filterPriority || filterLabelId || filterOverdue;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFilterAssignee("");
+    setFilterPriority("");
+    setFilterLabelId("");
+    setFilterOverdue(false);
+  };
+
+  const getTodoTasks = () => filteredTasks.filter((t) => t.status === "todo");
+  const getInProgressTasks = () => filteredTasks.filter((t) => t.status === "inprogress");
+  const getDoneTasks = () => filteredTasks.filter((t) => t.status === "done");
+
+  // Overdue count (unfiltered)
+  const overdueCount = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return tasks.filter((t) => {
+      if (t.status === "done" || !t.dueDate) return false;
+      const due = new Date(t.dueDate);
+      if (Number.isNaN(due.getTime())) return false;
+      due.setHours(0, 0, 0, 0);
+      return due < today;
+    }).length;
+  }, [tasks]);
+
+  // Calculate task statistics (from unfiltered tasks)
   const totalTasks = tasks.length;
-  const completedTasks = getDoneTasks().length;
-  const inProgressTasks = getInProgressTasks().length;
-  const todoTasks = getTodoTasks().length;
+  const completedTasks = tasks.filter((t) => t.status === "done").length;
+  const inProgressTasks = tasks.filter((t) => t.status === "inprogress").length;
+  const todoTasks = tasks.filter((t) => t.status === "todo").length;
   const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const KanbanColumn = ({
@@ -652,15 +752,135 @@ export default function ProjectDetails() {
           </div>
         </div>
 
-        {/* Add Task Button */}
-        <div className="mb-6 flex justify-end">
-          <button
-            onClick={handleAddTask}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-5 h-5" />
-            Add Task
-          </button>
+        {/* Toolbar: Search + Filters + Add Task */}
+        <div className="mb-6 space-y-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* Toggle filters */}
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                showFilters || hasActiveFilters
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 w-2 h-2 rounded-full bg-primary" />
+              )}
+            </button>
+
+            {/* Overdue quick filter */}
+            {overdueCount > 0 && (
+              <button
+                onClick={() => { setFilterOverdue((v) => !v); setShowFilters(true); }}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                  filterOverdue
+                    ? "bg-red-100 dark:bg-red-900/30 border-red-300 text-red-700 dark:text-red-400"
+                    : "border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4" />
+                {overdueCount} Overdue
+              </button>
+            )}
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear
+              </button>
+            )}
+
+            <div className="flex-1" />
+
+            <button
+              onClick={handleAddTask}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-5 h-5" />
+              Add Task
+            </button>
+          </div>
+
+          {/* Expanded filter row */}
+          {showFilters && (
+            <motion.div
+              className="flex items-center gap-3 flex-wrap p-3 bg-secondary/30 border border-border rounded-lg"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Assignee */}
+              <select
+                value={filterAssignee}
+                onChange={(e) => setFilterAssignee(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-border rounded-lg bg-input text-foreground"
+              >
+                <option value="">All assignees</option>
+                {uniqueAssignees.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+
+              {/* Priority */}
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-border rounded-lg bg-input text-foreground"
+              >
+                <option value="">All priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+
+              {/* Label */}
+              <select
+                value={filterLabelId}
+                onChange={(e) => setFilterLabelId(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-border rounded-lg bg-input text-foreground"
+              >
+                <option value="">All labels</option>
+                {projectLabels.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+
+              {/* Overdue toggle */}
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterOverdue}
+                  onChange={(e) => setFilterOverdue(e.target.checked)}
+                  className="rounded border-border"
+                />
+                Overdue only
+              </label>
+
+              {hasActiveFilters && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Showing {filteredTasks.length} of {tasks.length} tasks
+                </span>
+              )}
+            </motion.div>
+          )}
         </div>
 
         {/* Kanban Board */}

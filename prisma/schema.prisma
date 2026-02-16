@@ -47,6 +47,7 @@ model Project {
   invitations Invitation[]
   whiteboard  Whiteboard?
   documents   Document[]
+  labels      Label[]
   
   @@index([ownerId])
 }
@@ -165,6 +166,8 @@ model Task {
   updatedAt    DateTime      @updatedAt
   activityLogs ActivityLog[]
   comments     Comment[]
+  labels       TaskLabel[]
+  attachments  TaskAttachment[]
 
   // Dependencies
   blockedBy    TaskDependency[] @relation("BlockedTask")
@@ -183,6 +186,44 @@ model TaskDependency {
   @@unique([blockedTaskId, blockingTaskId])
   @@index([blockedTaskId])
   @@index([blockingTaskId])
+}
+
+model Label {
+  id        Int         @id @default(autoincrement())
+  projectId Int
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  color     String      @default("#3b82f6") // hex color
+  createdAt DateTime    @default(now())
+  tasks     TaskLabel[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model TaskLabel {
+  id      Int   @id @default(autoincrement())
+  taskId  Int
+  labelId Int
+  task    Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label   Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, labelId])
+  @@index([taskId])
+  @@index([labelId])
+}
+
+model TaskAttachment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  filename  String
+  mimetype  String
+  size      Int      // bytes
+  data      Bytes    // file content stored as blob
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
 }
 
 model Comment {
