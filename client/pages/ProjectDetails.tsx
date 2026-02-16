@@ -20,7 +20,10 @@ import TimeMachine from "@/components/TimeMachine";
 import TaskTemplates from "@/components/TaskTemplates";
 import KanbanSwimlanes from "@/components/KanbanSwimlanes";
 import LivePresence from "@/components/LivePresence";
+import AutoPlanDay from "@/components/AutoPlanDay";
+import ProjectAnalytics from "@/components/ProjectAnalytics";
 import type { TaskTemplate } from "@/lib/taskTemplates";
+import { addXP, XP_REWARDS } from "@/lib/xp";
 
 interface Project {
   id: number;
@@ -274,8 +277,10 @@ export default function ProjectDetails() {
 
           if (beforeStatus !== "done" && updatedTask?.status === "done") {
             confettiBurst();
+            addXP("TASK_COMPLETED", XP_REWARDS.TASK_COMPLETED);
             const nextStreak = bumpCompletionStreak().streak;
             setStreak(nextStreak);
+            addXP("STREAK_DAY", XP_REWARDS.STREAK_DAY);
             const doneCount = incrementDoneCount();
             const newly = unlockAchievements({ streak: nextStreak, doneCount });
             if (newly.length > 0) {
@@ -297,6 +302,7 @@ export default function ProjectDetails() {
         if (response.ok) {
           const createdTask = await response.json();
           setTasks((prev) => [...prev, createdTask]);
+          addXP("TASK_CREATED", XP_REWARDS.TASK_CREATED);
           fetchLeaderboard();
         }
       }
@@ -826,6 +832,10 @@ export default function ProjectDetails() {
             {projectId && (
               <LivePresence projectId={parseInt(projectId)} />
             )}
+
+            <AutoPlanDay tasks={filteredTasks} userName={user?.name} />
+
+            <ProjectAnalytics tasks={tasks} projectName={project?.name || ""} />
 
             {projectId && (
               <TimeMachine projectId={parseInt(projectId)} tasks={tasks} />

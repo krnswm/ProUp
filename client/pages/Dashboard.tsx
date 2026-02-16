@@ -195,13 +195,22 @@ export default function Dashboard() {
             <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
               Welcome back! Here's your project overview at a glance.
             </p>
-            <Link
-              to="/weekly-recap"
-              className="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity shadow-md"
-            >
-              <BarChart3 className="w-4 h-4" />
-              Weekly Recap
-            </Link>
+            <div className="flex items-center gap-3 mt-3">
+              <Link
+                to="/weekly-recap"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity shadow-md"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Weekly Recap
+              </Link>
+              <Link
+                to="/journal"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg hover:opacity-90 transition-opacity shadow-md"
+              >
+                <Calendar className="w-4 h-4" />
+                Journal
+              </Link>
+            </div>
           </motion.div>
 
           {/* Summary Cards Grid */}

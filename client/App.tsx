@@ -24,6 +24,7 @@ import DocumentEditor from "./pages/DocumentEditor";
 import SpreadsheetEditor from "./pages/SpreadsheetEditor";
 import NotFound from "./pages/NotFound";
 import WeeklyRecap from "./pages/WeeklyRecap";
+import Journal from "./pages/Journal";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AmbientPlayer from "@/components/AmbientPlayer";
 import CommandPalette from "@/components/CommandPalette";
@@ -128,6 +129,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <WeeklyRecap />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/journal"
+              element={
+                <ProtectedRoute>
+                  <Journal />
                 </ProtectedRoute>
               }
             />

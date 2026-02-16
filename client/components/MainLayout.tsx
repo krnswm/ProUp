@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import XPBar from "@/components/XPBar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -261,6 +262,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <XPBar />
+
             <Link
               to="/inbox"
               className="relative p-2 rounded-xl bg-secondary/80 border border-border/50 hover:bg-primary/10 transition-colors"

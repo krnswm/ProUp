@@ -473,9 +473,7 @@ export default function AmbientPlayer() {
                   </button>
                 );
               })}
-              <p className="text-[9px] text-muted-foreground text-center pt-1">
-                Free internet radio streams · No account needed
-              </p>
+             
             </div>
           )}
 
