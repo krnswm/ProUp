@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { X, Calendar, User, Flag, CheckCircle, Pencil, Trash2, Tag, Paperclip, Download, Upload, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
+import { addXP, XP_REWARDS } from "@/lib/xp";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
@@ -640,6 +641,7 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
       const created = (await response.json()) as CommentItem;
       setComments((prev) => [...prev, created]);
       setCommentBody("");
+      addXP("COMMENT_ADDED", XP_REWARDS.COMMENT_ADDED);
     } catch (e) {
       setCommentError(e instanceof Error ? e.message : "Failed to create comment");
     }

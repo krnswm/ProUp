@@ -11,6 +11,7 @@ import {
   getAverageEnergy,
   type MoodEntry,
 } from "@/lib/mood";
+import { addXP, XP_REWARDS } from "@/lib/xp";
 
 export default function MoodCheckin() {
   const [todayEntry, setTodayEntry] = useState<MoodEntry | null>(null);
@@ -38,10 +39,14 @@ export default function MoodCheckin() {
       energy: selectedEnergy,
       emoji,
     };
+    const isNew = !getTodayEntry();
     saveEntry(entry);
     setTodayEntry(entry);
     setSaved(true);
     setRecentEntries(getRecentEntries(14));
+    if (isNew) {
+      addXP("DAILY_CHECKIN", XP_REWARDS.DAILY_CHECKIN);
+    }
   };
 
   const avgMood = getAverageMood(7);

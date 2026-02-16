@@ -10,6 +10,7 @@ import {
   DEFAULT_SETTINGS,
   type PomodoroSettings,
 } from "@/lib/pomodoro";
+import { addXP, XP_REWARDS } from "@/lib/xp";
 
 interface PomodoroTimerProps {
   taskId: number;
@@ -87,6 +88,7 @@ export default function PomodoroTimer({ taskId, taskTitle, minimized, onToggleMi
 
     if (phase === "focus") {
       setTotalFocus(getTotalFocusMinutes(taskId));
+      addXP("FOCUS_SESSION", XP_REWARDS.FOCUS_SESSION);
     }
 
     // Browser notification
