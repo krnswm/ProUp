@@ -16,6 +16,7 @@ import { incrementDoneCount, listAchievements, unlockAchievements } from "@/lib/
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import AiTaskSuggestions from "@/components/AiTaskSuggestions";
+import TimeMachine from "@/components/TimeMachine";
 
 interface Project {
   id: number;
@@ -810,6 +811,10 @@ export default function ProjectDetails() {
             )}
 
             <div className="flex-1" />
+
+            {projectId && (
+              <TimeMachine projectId={parseInt(projectId)} tasks={tasks} />
+            )}
 
             <AiTaskSuggestions
               onAddTask={async ({ title, priority, dueDate }) => {

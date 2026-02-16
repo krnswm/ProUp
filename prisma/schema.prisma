@@ -27,6 +27,7 @@ model User {
   notifications Notification[]
   comments      Comment[]
   templates     ProjectTemplate[]
+  reactions     TaskReaction[]
 }
 
 // Project model - represents a project that contains tasks
@@ -168,6 +169,8 @@ model Task {
   comments     Comment[]
   labels       TaskLabel[]
   attachments  TaskAttachment[]
+  reactions    TaskReaction[]
+  coverColor   String?       // custom card cover color/gradient
 
   // Dependencies
   blockedBy    TaskDependency[] @relation("BlockedTask")
@@ -223,6 +226,19 @@ model TaskAttachment {
   data      Bytes    // file content stored as blob
   createdAt DateTime @default(now())
 
+  @@index([taskId])
+}
+
+model TaskReaction {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String   // e.g. "👍", "🔥", "🎉"
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId, emoji])
   @@index([taskId])
 }
 

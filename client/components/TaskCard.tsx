@@ -1,11 +1,19 @@
-import { Edit2, Trash2, Calendar, History, AlertTriangle } from "lucide-react";
+import { Edit2, Trash2, Calendar, History, AlertTriangle, SmilePlus } from "lucide-react";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { api } from "@/lib/api";
 
 export interface TaskLabel {
   id: number;
   name: string;
   color: string;
   projectId: number;
+}
+
+export interface TaskReactionGroup {
+  emoji: string;
+  count: number;
+  userIds: number[];
 }
 
 export interface Task {
@@ -19,6 +27,9 @@ export interface Task {
   projectId?: number | null;
   position?: number;
   labels?: TaskLabel[];
+  reactions?: TaskReactionGroup[];
+  coverColor?: string | null;
+  createdAt?: string;
 }
 
 interface TaskCardProps {
@@ -29,7 +40,40 @@ interface TaskCardProps {
   onHistory: (task: Task) => void;
 }
 
+const REACTION_EMOJIS = ["👍", "🔥", "🎉", "❤️", "👀", "🚀"];
+
 export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: TaskCardProps) {
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [localReactions, setLocalReactions] = useState(task.reactions || []);
+
+  const handleReaction = async (emoji: string) => {
+    try {
+      const res = await api(`/api/tasks/${task.id}/reactions`, {
+        method: "POST",
+        body: JSON.stringify({ emoji }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const meId = parseInt(localStorage.getItem("userId") || "0");
+        setLocalReactions((prev) => {
+          const existing = prev.find((r) => r.emoji === emoji);
+          if (data.action === "added") {
+            if (existing) {
+              return prev.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1, userIds: [...r.userIds, meId] } : r);
+            }
+            return [...prev, { emoji, count: 1, userIds: [meId] }];
+          } else {
+            if (existing && existing.count <= 1) {
+              return prev.filter((r) => r.emoji !== emoji);
+            }
+            return prev.map((r) => r.emoji === emoji ? { ...r, count: r.count - 1, userIds: r.userIds.filter((id) => id !== meId) } : r);
+          }
+        });
+      }
+    } catch { /* ignore */ }
+    setShowEmojiPicker(false);
+  };
+
   const isOverdue = (() => {
     if (task.status === "done" || !task.dueDate) return false;
     const due = new Date(task.dueDate);
@@ -92,6 +136,11 @@ export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: 
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       onClick={() => onOpen?.(task)}
     >
+      {/* Cover color strip */}
+      {task.coverColor && (
+        <div className="absolute top-0 left-0 right-0 h-1.5 rounded-t-xl" style={{ background: task.coverColor }} />
+      )}
+
       {/* Gradient overlay on hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       
@@ -193,6 +242,53 @@ export default function TaskCard({ task, onOpen, onEdit, onDelete, onHistory }: 
             >
               <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive transition-colors" />
             </motion.button>
+          </div>
+        </div>
+
+        {/* Reactions bar */}
+        <div className="flex items-center gap-1 mt-3 flex-wrap">
+          {localReactions.map((r) => {
+            const meId = parseInt(localStorage.getItem("userId") || "0");
+            const iMeReacted = r.userIds.includes(meId);
+            return (
+              <button
+                key={r.emoji}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleReaction(r.emoji); }}
+                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+                  iMeReacted
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-secondary/50 border-border text-muted-foreground hover:bg-secondary"
+                }`}
+              >
+                <span>{r.emoji}</span>
+                <span className="font-medium">{r.count}</span>
+              </button>
+            );
+          })}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowEmojiPicker((v) => !v); }}
+              className="p-1 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              title="Add reaction"
+            >
+              <SmilePlus className="w-3.5 h-3.5" />
+            </button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-full left-0 mb-1 flex gap-0.5 p-1.5 bg-card border border-border rounded-lg shadow-lg z-20">
+                {REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleReaction(emoji); }}
+                    className="text-lg hover:scale-125 transition-transform p-0.5"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -23,7 +23,9 @@ import Whiteboard from "./pages/Whiteboard";
 import DocumentEditor from "./pages/DocumentEditor";
 import SpreadsheetEditor from "./pages/SpreadsheetEditor";
 import NotFound from "./pages/NotFound";
+import WeeklyRecap from "./pages/WeeklyRecap";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AmbientPlayer from "@/components/AmbientPlayer";
 
 const queryClient = new QueryClient();
 
@@ -120,6 +122,15 @@ const App = () => {
               }
             />
 
+            <Route
+              path="/weekly-recap"
+              element={
+                <ProtectedRoute>
+                  <WeeklyRecap />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Join Project via Invitation */}
             <Route path="/join-project/:token" element={<JoinProject />} />
 
@@ -127,6 +138,7 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          <AmbientPlayer />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

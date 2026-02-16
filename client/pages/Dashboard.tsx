@@ -1,5 +1,5 @@
 import MainLayout from "@/components/MainLayout";
-import { Folder, CheckCircle, Clock, ListTodo, TrendingUp, AlertTriangle, Calendar } from "lucide-react";
+import { Folder, CheckCircle, Clock, ListTodo, TrendingUp, AlertTriangle, Calendar, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -195,6 +195,13 @@ export default function Dashboard() {
             <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
               Welcome back! Here's your project overview at a glance.
             </p>
+            <Link
+              to="/weekly-recap"
+              className="inline-flex items-center gap-2 mt-3 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity shadow-md"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Weekly Recap
+            </Link>
           </motion.div>
 
           {/* Summary Cards Grid */}

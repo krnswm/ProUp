@@ -32,6 +32,7 @@ import { addTaskDependency, getTaskDependencies, removeTaskDependency } from "./
 import { getProjectLeaderboard } from "./routes/leaderboard";
 import { getProjectLabels, createLabel, updateLabel, deleteLabel, addLabelToTask, removeLabelFromTask, getTaskLabels } from "./routes/labels";
 import { getTaskAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from "./routes/attachments";
+import { getTaskReactions, toggleReaction, updateTaskCover } from "./routes/reactions";
 
 export function createServer() {
   const app = express();
@@ -136,6 +137,11 @@ export function createServer() {
   app.post("/api/tasks/:taskId/attachments", uploadAttachment);
   app.get("/api/attachments/:attachmentId/download", downloadAttachment);
   app.delete("/api/attachments/:attachmentId", deleteAttachment);
+
+  // Reaction routes
+  app.get("/api/tasks/:taskId/reactions", getTaskReactions);
+  app.post("/api/tasks/:taskId/reactions", toggleReaction);
+  app.patch("/api/tasks/:taskId/cover", updateTaskCover);
 
   // Whiteboard routes
   app.get("/api/whiteboard/:projectId", getWhiteboard);
