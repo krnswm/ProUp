@@ -34,6 +34,17 @@ import { getProjectLabels, createLabel, updateLabel, deleteLabel, addLabelToTask
 import { getTaskAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from "./routes/attachments";
 import { getTaskReactions, toggleReaction, updateTaskCover } from "./routes/reactions";
 import { getChatMessages, postChatMessage } from "./routes/chat";
+import {
+  listIntegrations,
+  disconnectIntegration,
+  googleAuth,
+  googleCallback,
+  googleDriveFiles,
+  githubAuth,
+  githubCallback,
+  githubRepos,
+  githubPulls,
+} from "./routes/integrations";
 
 export function createServer() {
   const app = express();
@@ -55,6 +66,10 @@ export function createServer() {
   app.post("/api/auth/forgot-password", forgotPassword);
   app.post("/api/auth/reset-password", resetPassword);
   app.get("/api/auth/users", getAllUsers);
+
+  // OAuth callbacks (public — providers redirect here without auth headers)
+  app.get("/api/integrations/google/callback", googleCallback);
+  app.get("/api/integrations/github/callback", githubCallback);
   
   // Apply authentication middleware to all routes below this point
   app.use(authenticate);
@@ -151,6 +166,15 @@ export function createServer() {
   // Chat routes
   app.get("/api/projects/:projectId/chat", getChatMessages);
   app.post("/api/projects/:projectId/chat", postChatMessage);
+
+  // Integration routes (protected)
+  app.get("/api/integrations", listIntegrations);
+  app.delete("/api/integrations/:provider", disconnectIntegration);
+  app.get("/api/integrations/google/auth", googleAuth);
+  app.get("/api/integrations/github/auth", githubAuth);
+  app.get("/api/integrations/google/drive/files", googleDriveFiles);
+  app.get("/api/integrations/github/repos", githubRepos);
+  app.get("/api/integrations/github/repos/:owner/:repo/pulls", githubPulls);
 
   // Document routes
   app.get("/api/documents/:projectId", getDocuments);

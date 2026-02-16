@@ -29,6 +29,7 @@ model User {
   templates     ProjectTemplate[]
   reactions     TaskReaction[]
   chatMessages  ChatMessage[]
+  oauthTokens   OAuthToken[]
 }
 
 // Project model - represents a project that contains tasks
@@ -287,6 +288,24 @@ model Notification {
   @@index([userId])
   @@index([readAt])
   @@index([createdAt])
+}
+
+model OAuthToken {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  provider     String   // "google" | "github"
+  accessToken  String
+  refreshToken String?
+  scope        String?
+  accountLabel String?  // e.g. email or username
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
 }
 
 model ChatMessage {
