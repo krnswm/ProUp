@@ -22,6 +22,8 @@ import KanbanSwimlanes from "@/components/KanbanSwimlanes";
 import LivePresence from "@/components/LivePresence";
 import AutoPlanDay from "@/components/AutoPlanDay";
 import ProjectAnalytics from "@/components/ProjectAnalytics";
+import FocusMode, { FocusModeButton } from "@/components/FocusMode";
+import StandupGenerator from "@/components/StandupGenerator";
 import type { TaskTemplate } from "@/lib/taskTemplates";
 import { addXP, XP_REWARDS } from "@/lib/xp";
 
@@ -87,6 +89,9 @@ export default function ProjectDetails() {
   type SwimGroupBy = "assignee" | "priority" | "label";
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [swimGroupBy, setSwimGroupBy] = useState<SwimGroupBy>("assignee");
+
+  // Focus mode
+  const [focusTask, setFocusTask] = useState<any>(null);
 
   // Fetch project labels
   useEffect(() => {
@@ -833,6 +838,10 @@ export default function ProjectDetails() {
               <LivePresence projectId={parseInt(projectId)} />
             )}
 
+            {projectId && (
+              <StandupGenerator projectId={parseInt(projectId)} projectName={project?.name || ""} />
+            )}
+
             <AutoPlanDay tasks={filteredTasks} userName={user?.name} />
 
             <ProjectAnalytics tasks={tasks} projectName={project?.name || ""} />
@@ -1042,6 +1051,28 @@ export default function ProjectDetails() {
           }}
           taskId={historyTask.id}
           taskTitle={historyTask.title}
+        />
+      )}
+
+      {/* Focus Mode */}
+      {focusTask && (
+        <FocusMode
+          task={focusTask}
+          onClose={() => setFocusTask(null)}
+          onMarkDone={async (taskId) => {
+            try {
+              const response = await api(`/api/tasks/${taskId}`, {
+                method: "PUT",
+                body: JSON.stringify({ status: "done", projectId: projectId ? parseInt(projectId) : null }),
+              });
+              if (response.ok) {
+                const updated = await response.json();
+                setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+                addXP("TASK_COMPLETED", XP_REWARDS.TASK_COMPLETED);
+                setFocusTask(null);
+              }
+            } catch { /* ignore */ }
+          }}
         />
       )}
     </MainLayout>

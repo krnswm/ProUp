@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { getRealtimeSocket } from "@/lib/realtimeSocket";
 import XPBar from "@/components/XPBar";
+import SmartAlerts from "@/components/SmartAlerts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -263,6 +264,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <XPBar />
+
+            <SmartAlerts />
 
             <Link
               to="/inbox"
