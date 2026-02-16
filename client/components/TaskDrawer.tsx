@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Task, TaskLabel } from "./TaskCard";
+import PomodoroTimer from "./PomodoroTimer";
 
 interface TaskDrawerProps {
   open: boolean;
@@ -1142,6 +1143,11 @@ export default function TaskDrawer({ open, onOpenChange, onSave, task, readOnly 
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Pomodoro Timer */}
+            {isEdit && task?.id && (
+              <PomodoroTimer taskId={task.id} taskTitle={task.title} />
             )}
 
             {/* Attachments Section */}

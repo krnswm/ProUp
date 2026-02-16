@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import ActivityHeatmap from "@/components/ActivityHeatmap";
+import MoodCheckin from "@/components/MoodCheckin";
 
 interface DashboardAnalytics {
   totalProjects: number;
@@ -39,6 +41,7 @@ export default function Dashboard() {
     projectName?: string;
   };
   const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
+  const [completionDates, setCompletionDates] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -49,6 +52,7 @@ export default function Dashboard() {
         }
         const data = await response.json();
         setStats(data);
+        setCompletionDates(Array.isArray(data.completionDates) ? data.completionDates : []);
         setError(null); // Clear any previous errors
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -286,6 +290,16 @@ export default function Dashboard() {
               </div>
             </motion.div>
           )}
+
+          {/* Activity Heatmap + Mood Check-in */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 sm:mb-10">
+            <div className="lg:col-span-2">
+              <ActivityHeatmap completionDates={completionDates} />
+            </div>
+            <div>
+              <MoodCheckin />
+            </div>
+          </div>
 
           {/* Progress Section */}
           <motion.div 

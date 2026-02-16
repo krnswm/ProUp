@@ -86,6 +86,29 @@ export const getDashboardAnalytics: RequestHandler = async (req: AuthRequest, re
       ? (totalTasks / totalProjects).toFixed(1) 
       : '0';
 
+    // Collect completion dates from activity logs (status changed to done)
+    const taskIds = allTasks.map((t) => t.id);
+    const activityLogs = taskIds.length > 0
+      ? await prisma.activityLog.findMany({
+          where: {
+            taskId: { in: taskIds },
+            fieldName: 'status',
+            newValue: 'done',
+          },
+          select: { timestamp: true },
+          orderBy: { timestamp: 'asc' },
+        })
+      : [];
+
+    const completionDates = activityLogs.map((l) => l.timestamp.toISOString());
+
+    // Also include updatedAt of done tasks as fallback
+    for (const t of allTasks) {
+      if (t.status === 'done') {
+        completionDates.push(t.updatedAt.toISOString());
+      }
+    }
+
     // Return analytics
     res.json({
       totalProjects,
@@ -100,6 +123,7 @@ export const getDashboardAnalytics: RequestHandler = async (req: AuthRequest, re
       avgTasksPerProject: parseFloat(avgTasksPerProject),
       recentTasks,
       tasksByProject,
+      completionDates,
     });
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);

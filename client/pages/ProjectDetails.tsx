@@ -15,6 +15,7 @@ import { bumpCompletionStreak, confettiBurst, readCompletionStreak } from "@/lib
 import { incrementDoneCount, listAchievements, unlockAchievements } from "@/lib/achievements";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import AiTaskSuggestions from "@/components/AiTaskSuggestions";
 
 interface Project {
   id: number;
@@ -809,6 +810,30 @@ export default function ProjectDetails() {
             )}
 
             <div className="flex-1" />
+
+            <AiTaskSuggestions
+              onAddTask={async ({ title, priority, dueDate }) => {
+                try {
+                  const response = await api('/api/tasks', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      title,
+                      priority,
+                      dueDate,
+                      assignedUser: user?.name || 'Unassigned',
+                      status: 'todo',
+                      projectId: projectId ? parseInt(projectId) : null,
+                    }),
+                  });
+                  if (response.ok) {
+                    const created = await response.json();
+                    setTasks((prev) => [...prev, created]);
+                  }
+                } catch (error) {
+                  console.error('Error creating AI-suggested task:', error);
+                }
+              }}
+            />
 
             <button
               onClick={handleAddTask}
