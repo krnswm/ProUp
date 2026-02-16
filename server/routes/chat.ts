@@ -1,8 +1,6 @@
 import { RequestHandler } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../prisma";
 import { getIO } from "../realtime";
-
-const prisma = new PrismaClient();
 
 // GET /api/projects/:projectId/chat?cursor=&limit=
 export const getChatMessages: RequestHandler = async (req, res) => {
@@ -37,7 +35,7 @@ export const postChatMessage: RequestHandler = async (req, res) => {
     const projectId = parseInt(req.params.projectId as string);
     if (isNaN(projectId)) return res.status(400).json({ error: "Invalid projectId" });
 
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { body } = req.body;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
-import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText, Trophy, Search, Filter, AlertTriangle, X } from "lucide-react";
+import { Plus, CheckCircle, Clock, ListTodo, TrendingUp, Users, LayoutGrid, PenTool, FileText, Trophy, Search, Filter, AlertTriangle, X, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import MainLayout from "@/components/MainLayout";
 import TaskCard, { Task, TaskLabel } from "@/components/TaskCard";
@@ -542,51 +542,62 @@ export default function ProjectDetails() {
 
   return (
     <MainLayout>
-      <div className="p-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
         {/* Project Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">{project?.name || "Loading..."}</h1>
-          <p className="text-muted-foreground mt-2">{project?.description}</p>
-        </div>
+        <motion.div
+          className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-md">
+              {(project?.name || "P").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">{project?.name || "Loading..."}</h1>
+              {project?.description && (
+                <p className="text-sm text-muted-foreground truncate max-w-lg">{project.description}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {projectId && <LivePresence projectId={parseInt(projectId)} />}
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
+              project?.status === "completed" ? "bg-green-500/10 text-green-600 border-green-500/20" :
+              project?.status === "paused" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
+              "bg-blue-500/10 text-blue-600 border-blue-500/20"
+            }`}>
+              {project?.status || "active"}
+            </span>
+          </div>
+        </motion.div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-border">
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px ${
-              activeTab === "tasks"
-                ? "text-primary border-primary"
-                : "text-muted-foreground border-transparent hover:text-foreground"
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4" />
-            Tasks
-          </button>
-          <button
-            onClick={() => setActiveTab("team")}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px ${
-              activeTab === "team"
-                ? "text-primary border-primary"
-                : "text-muted-foreground border-transparent hover:text-foreground"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Team
-          </button>
-          <button
-            onClick={() => setActiveTab("documents")}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px ${
-              activeTab === "documents"
-                ? "text-primary border-primary"
-                : "text-muted-foreground border-transparent hover:text-foreground"
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            Documents
-          </button>
+        <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+          {([
+            { key: "tasks", label: "Tasks", icon: LayoutGrid },
+            { key: "team", label: "Team", icon: Users },
+            { key: "documents", label: "Documents", icon: FileText },
+          ] as const).map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? "text-primary border-primary"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
           <Link
             to={`/project/${projectId}/whiteboard`}
-            className="flex items-center gap-2 px-4 py-3 font-medium transition-all border-b-2 -mb-px text-muted-foreground border-transparent hover:text-foreground"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px text-muted-foreground border-transparent hover:text-foreground hover:border-border whitespace-nowrap"
           >
             <PenTool className="w-4 h-4" />
             Whiteboard
@@ -776,68 +787,102 @@ export default function ProjectDetails() {
           </div>
         </div>
 
-        {/* Toolbar: Search + Filters + Add Task */}
+        {/* Toolbar */}
         <div className="mb-6 space-y-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
+          {/* Row 1: Search + Filters + View + Add Task */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search tasks..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-xl bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
               />
             </div>
 
-            {/* Toggle filters */}
             <button
               onClick={() => setShowFilters((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-colors ${
                 showFilters || hasActiveFilters
                   ? "bg-primary/10 border-primary/30 text-primary"
                   : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
               }`}
             >
               <Filter className="w-4 h-4" />
-              Filters
-              {hasActiveFilters && (
-                <span className="ml-1 w-2 h-2 rounded-full bg-primary" />
-              )}
+              <span className="hidden sm:inline">Filters</span>
+              {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary" />}
             </button>
 
-            {/* Overdue quick filter */}
             {overdueCount > 0 && (
               <button
                 onClick={() => { setFilterOverdue((v) => !v); setShowFilters(true); }}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-colors ${
                   filterOverdue
                     ? "bg-red-100 dark:bg-red-900/30 border-red-300 text-red-700 dark:text-red-400"
                     : "border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
                 }`}
               >
-                <AlertTriangle className="w-4 h-4" />
-                {overdueCount} Overdue
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {overdueCount}
               </button>
             )}
 
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="p-2 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                title="Clear filters"
               >
-                <X className="w-3.5 h-3.5" />
-                Clear
+                <X className="w-4 h-4" />
               </button>
             )}
 
-            <div className="flex-1" />
+            <div className="flex-1 min-w-0" />
 
-            {/* Live Presence */}
-            {projectId && (
-              <LivePresence projectId={parseInt(projectId)} />
+            {/* View toggle */}
+            <div className="flex items-center border border-border rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                className={`px-3 py-2 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+              >
+                Board
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("swimlane")}
+                className={`px-3 py-2 text-xs font-medium transition-colors ${viewMode === "swimlane" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+              >
+                Swim
+              </button>
+            </div>
+
+            {viewMode === "swimlane" && (
+              <select
+                value={swimGroupBy}
+                onChange={(e) => setSwimGroupBy(e.target.value as SwimGroupBy)}
+                className="px-2 py-2 text-xs border border-border rounded-xl bg-input text-foreground"
+              >
+                <option value="assignee">By Assignee</option>
+                <option value="priority">By Priority</option>
+                <option value="label">By Label</option>
+              </select>
             )}
+
+            <button
+              onClick={handleAddTask}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Task</span>
+            </button>
+          </div>
+
+          {/* Row 2: Tools — grouped logically */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mr-1">Tools</span>
 
             {projectId && (
               <ProjectChat projectId={parseInt(projectId)} projectName={project?.name || ""} />
@@ -861,43 +906,12 @@ export default function ProjectDetails() {
                 due.setDate(due.getDate() + template.estimatedDays);
                 setEditingTask(undefined);
                 setIsDrawerOpen(true);
-                // Pre-fill via a short timeout so drawer resets first
                 setTimeout(() => {
                   const titleInput = document.querySelector<HTMLInputElement>('[data-field="title"]');
                   if (titleInput) titleInput.value = template.title;
                 }, 100);
               }}
             />
-
-            {/* View mode toggle */}
-            <div className="flex items-center border border-border rounded-lg overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setViewMode("kanban")}
-                className={`px-3 py-2 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
-              >
-                Board
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("swimlane")}
-                className={`px-3 py-2 text-xs font-medium transition-colors ${viewMode === "swimlane" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
-              >
-                Swimlanes
-              </button>
-            </div>
-
-            {viewMode === "swimlane" && (
-              <select
-                value={swimGroupBy}
-                onChange={(e) => setSwimGroupBy(e.target.value as SwimGroupBy)}
-                className="px-2 py-2 text-xs border border-border rounded-lg bg-input text-foreground"
-              >
-                <option value="assignee">By Assignee</option>
-                <option value="priority">By Priority</option>
-                <option value="label">By Label</option>
-              </select>
-            )}
 
             <AiTaskSuggestions
               onAddTask={async ({ title, priority, dueDate }) => {
@@ -922,25 +936,16 @@ export default function ProjectDetails() {
                 }
               }}
             />
-
-            <button
-              onClick={handleAddTask}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
-            >
-              <Plus className="w-5 h-5" />
-              Add Task
-            </button>
           </div>
 
           {/* Expanded filter row */}
           {showFilters && (
             <motion.div
-              className="flex items-center gap-3 flex-wrap p-3 bg-secondary/30 border border-border rounded-lg"
+              className="flex items-center gap-3 flex-wrap p-3 bg-secondary/20 border border-border rounded-xl"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               transition={{ duration: 0.2 }}
             >
-              {/* Assignee */}
               <select
                 value={filterAssignee}
                 onChange={(e) => setFilterAssignee(e.target.value)}
@@ -952,7 +957,6 @@ export default function ProjectDetails() {
                 ))}
               </select>
 
-              {/* Priority */}
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
@@ -964,7 +968,6 @@ export default function ProjectDetails() {
                 <option value="low">Low</option>
               </select>
 
-              {/* Label */}
               <select
                 value={filterLabelId}
                 onChange={(e) => setFilterLabelId(e.target.value)}
@@ -976,20 +979,19 @@ export default function ProjectDetails() {
                 ))}
               </select>
 
-              {/* Overdue toggle */}
               <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={filterOverdue}
                   onChange={(e) => setFilterOverdue(e.target.checked)}
-                  className="rounded border-border"
+                  className="rounded border-border accent-primary"
                 />
                 Overdue only
               </label>
 
               {hasActiveFilters && (
                 <span className="text-xs text-muted-foreground ml-auto">
-                  Showing {filteredTasks.length} of {tasks.length} tasks
+                  {filteredTasks.length} of {tasks.length}
                 </span>
               )}
             </motion.div>
@@ -998,7 +1000,7 @@ export default function ProjectDetails() {
 
         {/* Kanban Board / Swimlanes */}
         {viewMode === "kanban" ? (
-          <div className="flex gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
             <KanbanColumn title="To Do" tasks={getTodoTasks()} status="todo" />
             <KanbanColumn title="In Progress" tasks={getInProgressTasks()} status="inprogress" />
             <KanbanColumn title="Done" tasks={getDoneTasks()} status="done" />
