@@ -138,9 +138,9 @@ const App = () => {
             {/* Catch-all 404 */}
             <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
           <AmbientPlayer />
           <CommandPalette />
+          </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
