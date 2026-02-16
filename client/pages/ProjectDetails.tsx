@@ -24,6 +24,7 @@ import AutoPlanDay from "@/components/AutoPlanDay";
 import ProjectAnalytics from "@/components/ProjectAnalytics";
 import FocusMode, { FocusModeButton } from "@/components/FocusMode";
 import StandupGenerator from "@/components/StandupGenerator";
+import ProjectChat from "@/components/ProjectChat";
 import type { TaskTemplate } from "@/lib/taskTemplates";
 import { addXP, XP_REWARDS } from "@/lib/xp";
 
@@ -836,6 +837,10 @@ export default function ProjectDetails() {
             {/* Live Presence */}
             {projectId && (
               <LivePresence projectId={parseInt(projectId)} />
+            )}
+
+            {projectId && (
+              <ProjectChat projectId={parseInt(projectId)} projectName={project?.name || ""} />
             )}
 
             {projectId && (

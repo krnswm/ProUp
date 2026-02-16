@@ -33,6 +33,7 @@ import { getProjectLeaderboard } from "./routes/leaderboard";
 import { getProjectLabels, createLabel, updateLabel, deleteLabel, addLabelToTask, removeLabelFromTask, getTaskLabels } from "./routes/labels";
 import { getTaskAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from "./routes/attachments";
 import { getTaskReactions, toggleReaction, updateTaskCover } from "./routes/reactions";
+import { getChatMessages, postChatMessage } from "./routes/chat";
 
 export function createServer() {
   const app = express();
@@ -146,6 +147,10 @@ export function createServer() {
   // Whiteboard routes
   app.get("/api/whiteboard/:projectId", getWhiteboard);
   app.post("/api/whiteboard/:projectId", saveWhiteboard);
+
+  // Chat routes
+  app.get("/api/projects/:projectId/chat", getChatMessages);
+  app.post("/api/projects/:projectId/chat", postChatMessage);
 
   // Document routes
   app.get("/api/documents/:projectId", getDocuments);
