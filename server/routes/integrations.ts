@@ -8,6 +8,12 @@ function env() {
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
+    FIGMA_CLIENT_ID: process.env.FIGMA_CLIENT_ID || "",
+    FIGMA_CLIENT_SECRET: process.env.FIGMA_CLIENT_SECRET || "",
+    SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID || "",
+    SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET || "",
+    NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID || "",
+    NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET || "",
     APP_URL: process.env.APP_URL || "http://localhost:8080",
   };
 }
@@ -18,6 +24,15 @@ function googleRedirectUri() {
 }
 function githubRedirectUri() {
   return `${env().APP_URL}/api/integrations/github/callback`;
+}
+function figmaRedirectUri() {
+  return `${env().APP_URL}/api/integrations/figma/callback`;
+}
+function slackRedirectUri() {
+  return `${env().APP_URL}/api/integrations/slack/callback`;
+}
+function notionRedirectUri() {
+  return `${env().APP_URL}/api/integrations/notion/callback`;
 }
 
 // ── GET /api/integrations — list connected integrations ─────────
@@ -40,8 +55,14 @@ export const listIntegrations: RequestHandler = async (req, res) => {
 
     const googleToken = tokens.find((t) => t.provider === "google");
     const githubToken = tokens.find((t) => t.provider === "github");
+    const figmaToken = tokens.find((t) => t.provider === "figma");
+    const slackToken = tokens.find((t) => t.provider === "slack");
+    const notionToken = tokens.find((t) => t.provider === "notion");
     const googleConfigured = !!env().GOOGLE_CLIENT_ID;
     const githubConfigured = !!env().GITHUB_CLIENT_ID;
+    const figmaConfigured = !!env().FIGMA_CLIENT_ID;
+    const slackConfigured = !!env().SLACK_CLIENT_ID;
+    const notionConfigured = !!env().NOTION_CLIENT_ID;
 
     // Build response — Google split into Drive, Calendar, Gmail (share one OAuth token)
     const result = [
@@ -109,6 +130,54 @@ export const listIntegrations: RequestHandler = async (req, res) => {
         scope: githubToken?.scope || null,
         dataEndpoint: "/api/integrations/github/repos",
       },
+      {
+        id: "figma",
+        provider: "figma",
+        name: "Figma",
+        description: "Browse your Figma files and projects, preview designs linked to tasks",
+        icon: "🎨",
+        category: "design",
+        color: "#a259ff",
+        features: ["Browse files", "Project list", "Design previews", "Open in Figma"],
+        configured: figmaConfigured,
+        connected: !!figmaToken,
+        accountLabel: figmaToken?.accountLabel || null,
+        connectedAt: figmaToken?.createdAt || null,
+        scope: figmaToken?.scope || null,
+        dataEndpoint: "/api/integrations/figma/files",
+      },
+      {
+        id: "slack",
+        provider: "slack",
+        name: "Slack",
+        description: "View your Slack channels and recent messages, bridge team communication",
+        icon: "💬",
+        category: "communication",
+        color: "#4a154b",
+        features: ["List channels", "Recent messages", "Team info", "Open in Slack"],
+        configured: slackConfigured,
+        connected: !!slackToken,
+        accountLabel: slackToken?.accountLabel || null,
+        connectedAt: slackToken?.createdAt || null,
+        scope: slackToken?.scope || null,
+        dataEndpoint: "/api/integrations/slack/channels",
+      },
+      {
+        id: "notion",
+        provider: "notion",
+        name: "Notion",
+        description: "Access your Notion pages and databases, link docs to project tasks",
+        icon: "📝",
+        category: "productivity",
+        color: "#000000",
+        features: ["Browse pages", "Databases", "Search content", "Open in Notion"],
+        configured: notionConfigured,
+        connected: !!notionToken,
+        accountLabel: notionToken?.accountLabel || null,
+        connectedAt: notionToken?.createdAt || null,
+        scope: notionToken?.scope || null,
+        dataEndpoint: "/api/integrations/notion/pages",
+      },
     ];
 
     res.json(result);
@@ -125,7 +194,7 @@ export const disconnectIntegration: RequestHandler = async (req, res) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const provider = req.params.provider as string;
-    if (!["google", "github"].includes(provider)) {
+    if (!["google", "github", "figma", "slack", "notion"].includes(provider)) {
       return res.status(400).json({ error: "Invalid provider" });
     }
 
@@ -627,5 +696,318 @@ export const githubPulls: RequestHandler = async (req, res) => {
   } catch (error) {
     console.error("Error fetching GitHub PRs:", error);
     res.status(500).json({ error: "Failed to fetch PRs" });
+  }
+};
+
+// ── FIGMA OAuth ─────────────────────────────────────────────────
+
+export const figmaAuth: RequestHandler = (req, res) => {
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!env().FIGMA_CLIENT_ID) {
+    return res.status(500).json({ error: "Figma OAuth not configured" });
+  }
+  const params = new URLSearchParams({
+    client_id: env().FIGMA_CLIENT_ID,
+    redirect_uri: figmaRedirectUri(),
+    scope: "files:read",
+    state: String(userId),
+    response_type: "code",
+  });
+  res.json({ url: `https://www.figma.com/oauth?${params}` });
+};
+
+export const figmaCallback: RequestHandler = async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    const userId = parseInt(req.query.state as string);
+    if (!code || !userId) return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
+
+    const tokenRes = await fetch("https://www.figma.com/api/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: env().FIGMA_CLIENT_ID,
+        client_secret: env().FIGMA_CLIENT_SECRET,
+        redirect_uri: figmaRedirectUri(),
+        code,
+        grant_type: "authorization_code",
+      }),
+    });
+    if (!tokenRes.ok) return res.redirect(`${env().APP_URL}/integrations?error=token_exchange_failed`);
+    const tokenData = await tokenRes.json();
+
+    let accountLabel = "Figma Account";
+    try {
+      const meRes = await fetch("https://api.figma.com/v1/me", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        accountLabel = me.email || me.handle || accountLabel;
+      }
+    } catch { /* ignore */ }
+
+    await prisma.oAuthToken.upsert({
+      where: { userId_provider: { userId, provider: "figma" } },
+      create: {
+        userId, provider: "figma",
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token || null,
+        scope: "files:read",
+        accountLabel,
+        expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null,
+      },
+      update: {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token || undefined,
+        accountLabel,
+        expiresAt: tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : undefined,
+      },
+    });
+    res.redirect(`${env().APP_URL}/integrations?connected=figma`);
+  } catch (error) {
+    console.error("Figma callback error:", error);
+    res.redirect(`${env().APP_URL}/integrations?error=callback_failed`);
+  }
+};
+
+// GET /api/integrations/figma/files — list recent Figma files
+export const figmaFiles: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const token = await prisma.oAuthToken.findUnique({
+      where: { userId_provider: { userId, provider: "figma" } },
+    });
+    if (!token) return res.status(404).json({ error: "Figma not connected" });
+
+    const filesRes = await fetch("https://api.figma.com/v1/me/files?page_size=15", {
+      headers: { Authorization: `Bearer ${token.accessToken}` },
+    });
+    if (!filesRes.ok) return res.status(filesRes.status).json({ error: "Figma API error" });
+
+    const data = await filesRes.json();
+    const projects = data.projects || [];
+    const files: any[] = [];
+    for (const proj of projects) {
+      for (const file of proj.files || []) {
+        files.push({
+          id: file.key,
+          name: file.name,
+          thumbnailUrl: file.thumbnail_url,
+          lastModified: file.last_modified,
+          url: `https://www.figma.com/file/${file.key}`,
+          projectName: proj.name,
+        });
+      }
+    }
+    res.json(files.slice(0, 20));
+  } catch (error) {
+    console.error("Error fetching Figma files:", error);
+    res.status(500).json({ error: "Failed to fetch Figma files" });
+  }
+};
+
+// ── SLACK OAuth ─────────────────────────────────────────────────
+
+export const slackAuth: RequestHandler = (req, res) => {
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!env().SLACK_CLIENT_ID) {
+    return res.status(500).json({ error: "Slack OAuth not configured" });
+  }
+  const params = new URLSearchParams({
+    client_id: env().SLACK_CLIENT_ID,
+    redirect_uri: slackRedirectUri(),
+    scope: "channels:read,channels:history,team:read,users:read",
+    state: String(userId),
+  });
+  res.json({ url: `https://slack.com/oauth/v2/authorize?${params}` });
+};
+
+export const slackCallback: RequestHandler = async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    const userId = parseInt(req.query.state as string);
+    if (!code || !userId) return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
+
+    const tokenRes = await fetch("https://slack.com/api/oauth.v2.access", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: env().SLACK_CLIENT_ID,
+        client_secret: env().SLACK_CLIENT_SECRET,
+        code,
+        redirect_uri: slackRedirectUri(),
+      }),
+    });
+    if (!tokenRes.ok) return res.redirect(`${env().APP_URL}/integrations?error=token_exchange_failed`);
+    const tokenData = await tokenRes.json();
+    if (!tokenData.ok) return res.redirect(`${env().APP_URL}/integrations?error=${tokenData.error || "slack_error"}`);
+
+    const accessToken = tokenData.access_token;
+    const teamName = tokenData.team?.name || "Slack Workspace";
+
+    await prisma.oAuthToken.upsert({
+      where: { userId_provider: { userId, provider: "slack" } },
+      create: {
+        userId, provider: "slack",
+        accessToken,
+        refreshToken: null,
+        scope: tokenData.scope || null,
+        accountLabel: teamName,
+        expiresAt: null,
+      },
+      update: { accessToken, scope: tokenData.scope || undefined, accountLabel: teamName },
+    });
+    res.redirect(`${env().APP_URL}/integrations?connected=slack`);
+  } catch (error) {
+    console.error("Slack callback error:", error);
+    res.redirect(`${env().APP_URL}/integrations?error=callback_failed`);
+  }
+};
+
+// GET /api/integrations/slack/channels — list Slack channels
+export const slackChannels: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const token = await prisma.oAuthToken.findUnique({
+      where: { userId_provider: { userId, provider: "slack" } },
+    });
+    if (!token) return res.status(404).json({ error: "Slack not connected" });
+
+    const chRes = await fetch("https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=20", {
+      headers: { Authorization: `Bearer ${token.accessToken}` },
+    });
+    if (!chRes.ok) return res.status(chRes.status).json({ error: "Slack API error" });
+    const data = await chRes.json();
+    if (!data.ok) return res.status(400).json({ error: data.error || "Slack API error" });
+
+    res.json(
+      (data.channels || []).map((ch: any) => ({
+        id: ch.id,
+        name: ch.name,
+        topic: ch.topic?.value || "",
+        purpose: ch.purpose?.value || "",
+        memberCount: ch.num_members || 0,
+        isPrivate: ch.is_private,
+        url: `https://slack.com/app_redirect?channel=${ch.id}`,
+      }))
+    );
+  } catch (error) {
+    console.error("Error fetching Slack channels:", error);
+    res.status(500).json({ error: "Failed to fetch Slack channels" });
+  }
+};
+
+// ── NOTION OAuth ────────────────────────────────────────────────
+
+export const notionAuth: RequestHandler = (req, res) => {
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!env().NOTION_CLIENT_ID) {
+    return res.status(500).json({ error: "Notion OAuth not configured" });
+  }
+  const params = new URLSearchParams({
+    client_id: env().NOTION_CLIENT_ID,
+    redirect_uri: notionRedirectUri(),
+    response_type: "code",
+    owner: "user",
+    state: String(userId),
+  });
+  res.json({ url: `https://api.notion.com/v1/oauth/authorize?${params}` });
+};
+
+export const notionCallback: RequestHandler = async (req, res) => {
+  try {
+    const code = req.query.code as string;
+    const userId = parseInt(req.query.state as string);
+    if (!code || !userId) return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
+
+    const basicAuth = Buffer.from(`${env().NOTION_CLIENT_ID}:${env().NOTION_CLIENT_SECRET}`).toString("base64");
+    const tokenRes = await fetch("https://api.notion.com/v1/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: notionRedirectUri(),
+      }),
+    });
+    if (!tokenRes.ok) return res.redirect(`${env().APP_URL}/integrations?error=token_exchange_failed`);
+    const tokenData = await tokenRes.json();
+
+    const accountLabel = tokenData.workspace_name || tokenData.owner?.user?.name || "Notion Workspace";
+
+    await prisma.oAuthToken.upsert({
+      where: { userId_provider: { userId, provider: "notion" } },
+      create: {
+        userId, provider: "notion",
+        accessToken: tokenData.access_token,
+        refreshToken: null,
+        scope: null,
+        accountLabel,
+        expiresAt: null,
+      },
+      update: { accessToken: tokenData.access_token, accountLabel },
+    });
+    res.redirect(`${env().APP_URL}/integrations?connected=notion`);
+  } catch (error) {
+    console.error("Notion callback error:", error);
+    res.redirect(`${env().APP_URL}/integrations?error=callback_failed`);
+  }
+};
+
+// GET /api/integrations/notion/pages — list Notion pages
+export const notionPages: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const token = await prisma.oAuthToken.findUnique({
+      where: { userId_provider: { userId, provider: "notion" } },
+    });
+    if (!token) return res.status(404).json({ error: "Notion not connected" });
+
+    const searchRes = await fetch("https://api.notion.com/v1/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+      },
+      body: JSON.stringify({
+        page_size: 20,
+        sort: { direction: "descending", timestamp: "last_edited_time" },
+      }),
+    });
+    if (!searchRes.ok) return res.status(searchRes.status).json({ error: "Notion API error" });
+    const data = await searchRes.json();
+
+    res.json(
+      (data.results || []).map((item: any) => {
+        const isDb = item.object === "database";
+        const title = isDb
+          ? (item.title || []).map((t: any) => t.plain_text).join("") || "(Untitled database)"
+          : (item.properties?.title?.title || item.properties?.Name?.title || []).map((t: any) => t.plain_text).join("") || "(Untitled page)";
+        const icon = item.icon?.emoji || (isDb ? "📊" : "📄");
+        return {
+          id: item.id,
+          title,
+          icon,
+          type: item.object,
+          url: item.url,
+          lastEdited: item.last_edited_time,
+          createdTime: item.created_time,
+        };
+      })
+    );
+  } catch (error) {
+    console.error("Error fetching Notion pages:", error);
+    res.status(500).json({ error: "Failed to fetch Notion pages" });
   }
 };

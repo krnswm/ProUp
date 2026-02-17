@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plug, Search, Check, Unplug, ArrowLeft, Zap, Shield, ExternalLink, Loader2, AlertCircle, FolderOpen, GitPullRequest, Calendar, Mail, Clock, MapPin, Users } from "lucide-react";
+import { Plug, Search, Check, Unplug, ArrowLeft, Zap, Shield, ExternalLink, Loader2, AlertCircle, FolderOpen, GitPullRequest, Calendar, Mail, Clock, MapPin, Users, Pen, Hash, FileText, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/MainLayout";
@@ -34,6 +34,7 @@ const CATEGORIES = [
   { key: "productivity", label: "Productivity" },
   { key: "communication", label: "Communication" },
   { key: "development", label: "Development" },
+  { key: "design", label: "Design" },
 ];
 
 export default function Integrations() {
@@ -307,6 +308,106 @@ export default function Integrations() {
                 <span className="text-[10px] text-muted-foreground">
                   Updated {new Date(repo.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                 </span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          </a>
+        ),
+      },
+      "figma": {
+        title: "Figma — Your Design Files",
+        icon: <Pen className="w-4 h-4 text-purple-500" />,
+        renderItem: (file) => (
+          <a
+            key={file.id}
+            href={file.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
+          >
+            {file.thumbnailUrl ? (
+              <img src={file.thumbnailUrl} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-border" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                <Pen className="w-4 h-4 text-purple-500" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{file.name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                {file.projectName && (
+                  <span className="text-[10px] text-muted-foreground">{file.projectName}</span>
+                )}
+                {file.lastModified && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Updated {new Date(file.lastModified).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          </a>
+        ),
+      },
+      "slack": {
+        title: "Slack — Your Channels",
+        icon: <Hash className="w-4 h-4 text-purple-800 dark:text-purple-300" />,
+        renderItem: (ch) => (
+          <a
+            key={ch.id}
+            href={ch.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-purple-900/10 flex items-center justify-center flex-shrink-0">
+              {ch.isPrivate ? <Lock className="w-4 h-4 text-amber-500" /> : <Hash className="w-4 h-4 text-purple-600" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{ch.name}</p>
+                {ch.isPrivate && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded">Private</span>
+                )}
+              </div>
+              {ch.purpose && (
+                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{ch.purpose}</p>
+              )}
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Users className="w-3 h-3" /> {ch.memberCount} members
+                </span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          </a>
+        ),
+      },
+      "notion": {
+        title: "Notion — Your Pages & Databases",
+        icon: <FileText className="w-4 h-4 text-gray-900 dark:text-gray-100" />,
+        renderItem: (item) => (
+          <a
+            key={item.id}
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 text-lg">
+              {item.icon}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{item.title}</p>
+                <span className="text-[9px] px-1.5 py-0.5 bg-secondary text-muted-foreground rounded capitalize">{item.type}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                {item.lastEdited && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Edited {new Date(item.lastEdited).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                )}
               </div>
             </div>
             <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />

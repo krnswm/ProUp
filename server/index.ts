@@ -46,6 +46,15 @@ import {
   githubCallback,
   githubRepos,
   githubPulls,
+  figmaAuth,
+  figmaCallback,
+  figmaFiles,
+  slackAuth,
+  slackCallback,
+  slackChannels,
+  notionAuth,
+  notionCallback,
+  notionPages,
 } from "./routes/integrations";
 
 export function createServer() {
@@ -72,6 +81,9 @@ export function createServer() {
   // OAuth callbacks (public — providers redirect here without auth headers)
   app.get("/api/integrations/google/callback", googleCallback);
   app.get("/api/integrations/github/callback", githubCallback);
+  app.get("/api/integrations/figma/callback", figmaCallback);
+  app.get("/api/integrations/slack/callback", slackCallback);
+  app.get("/api/integrations/notion/callback", notionCallback);
   
   // Apply authentication middleware to all routes below this point
   app.use(authenticate);
@@ -179,6 +191,12 @@ export function createServer() {
   app.get("/api/integrations/google/gmail/messages", googleGmailMessages);
   app.get("/api/integrations/github/repos", githubRepos);
   app.get("/api/integrations/github/repos/:owner/:repo/pulls", githubPulls);
+  app.get("/api/integrations/figma/auth", figmaAuth);
+  app.get("/api/integrations/figma/files", figmaFiles);
+  app.get("/api/integrations/slack/auth", slackAuth);
+  app.get("/api/integrations/slack/channels", slackChannels);
+  app.get("/api/integrations/notion/auth", notionAuth);
+  app.get("/api/integrations/notion/pages", notionPages);
 
   // Document routes
   app.get("/api/documents/:projectId", getDocuments);
