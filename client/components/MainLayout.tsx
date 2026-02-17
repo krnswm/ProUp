@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, ListTodo, Bell, LogOut, Moon, Sun, BookOpen, Plug } from "lucide-react";
+import { Menu, X, LayoutDashboard, FolderOpen, CalendarDays, ListTodo, Bell, LogOut, Moon, Sun, BookOpen, Plug, PawPrint } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -102,6 +102,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
     { label: "Calendar", path: "/calendar", icon: CalendarDays },
     { label: "Journal", path: "/journal", icon: BookOpen },
     { label: "Integrations", path: "/integrations", icon: Plug },
+    { label: "My Pet", path: "/pet", icon: PawPrint },
   ];
 
   return (

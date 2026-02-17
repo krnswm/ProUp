@@ -26,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import WeeklyRecap from "./pages/WeeklyRecap";
 import Journal from "./pages/Journal";
 import Integrations from "./pages/Integrations";
+import VirtualPet from "./pages/VirtualPet";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AmbientPlayer from "@/components/AmbientPlayer";
 import CommandPalette from "@/components/CommandPalette";
@@ -146,6 +147,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Integrations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pet"
+              element={
+                <ProtectedRoute>
+                  <VirtualPet />
                 </ProtectedRoute>
               }
             />
