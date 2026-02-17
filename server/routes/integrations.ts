@@ -936,7 +936,7 @@ export const notionAuth: RequestHandler = (req, res) => {
     redirect_uri: notionRedirectUri(),
     response_type: "code",
     owner: "user",
-    state: String(userId),
+    state: `user_${userId}`,
   });
   res.json({ url: `https://api.notion.com/v1/oauth/authorize?${params}` });
 };
@@ -944,7 +944,8 @@ export const notionAuth: RequestHandler = (req, res) => {
 export const notionCallback: RequestHandler = async (req, res) => {
   try {
     const code = req.query.code as string;
-    const userId = parseInt(req.query.state as string);
+    const stateStr = (req.query.state as string || "").replace("user_", "");
+    const userId = parseInt(stateStr);
     if (!code || !userId) return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
 
     const basicAuth = Buffer.from(`${env().NOTION_CLIENT_ID}:${env().NOTION_CLIENT_SECRET}`).toString("base64");
