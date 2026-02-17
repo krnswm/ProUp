@@ -1,19 +1,23 @@
 import { RequestHandler } from "express";
 import { prisma } from "../prisma";
 
-// ── ENV config ──────────────────────────────────────────────────
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "";
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
-const APP_URL = process.env.APP_URL || "http://localhost:8080";
+// ── ENV config (read at request time to ensure dotenv has loaded) ──
+function env() {
+  return {
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
+    APP_URL: process.env.APP_URL || "http://localhost:8080",
+  };
+}
 
 // ── Helpers ─────────────────────────────────────────────────────
 function googleRedirectUri() {
-  return `${APP_URL}/api/integrations/google/callback`;
+  return `${env().APP_URL}/api/integrations/google/callback`;
 }
 function githubRedirectUri() {
-  return `${APP_URL}/api/integrations/github/callback`;
+  return `${env().APP_URL}/api/integrations/github/callback`;
 }
 
 // ── GET /api/integrations — list connected integrations ─────────
@@ -44,7 +48,7 @@ export const listIntegrations: RequestHandler = async (req, res) => {
         category: "productivity",
         color: "#4285f4",
         features: ["Google Drive files", "Gmail access", "Calendar events", "Contacts"],
-        configured: !!GOOGLE_CLIENT_ID,
+        configured: !!env().GOOGLE_CLIENT_ID,
       },
       {
         id: "github",
@@ -54,7 +58,7 @@ export const listIntegrations: RequestHandler = async (req, res) => {
         category: "development",
         color: "#24292e",
         features: ["List repositories", "Pull requests", "Issues", "Commit history"],
-        configured: !!GITHUB_CLIENT_ID,
+        configured: !!env().GITHUB_CLIENT_ID,
       },
     ];
 
@@ -102,7 +106,7 @@ export const googleAuth: RequestHandler = (req, res) => {
   const userId = (req as any).user?.id;
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!GOOGLE_CLIENT_ID) {
+  if (!env().GOOGLE_CLIENT_ID) {
     return res.status(500).json({ error: "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env" });
   }
 
@@ -115,7 +119,7 @@ export const googleAuth: RequestHandler = (req, res) => {
   ];
 
   const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
+    client_id: env().GOOGLE_CLIENT_ID,
     redirect_uri: googleRedirectUri(),
     response_type: "code",
     scope: scopes.join(" "),
@@ -134,7 +138,7 @@ export const googleCallback: RequestHandler = async (req, res) => {
     const userId = parseInt(req.query.state as string);
 
     if (!code || !userId) {
-      return res.redirect(`${APP_URL}/integrations?error=missing_params`);
+      return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
     }
 
     // Exchange code for tokens
@@ -143,8 +147,8 @@ export const googleCallback: RequestHandler = async (req, res) => {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
+        client_id: env().GOOGLE_CLIENT_ID,
+        client_secret: env().GOOGLE_CLIENT_SECRET,
         redirect_uri: googleRedirectUri(),
         grant_type: "authorization_code",
       }),
@@ -153,7 +157,7 @@ export const googleCallback: RequestHandler = async (req, res) => {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("Google token exchange failed:", err);
-      return res.redirect(`${APP_URL}/integrations?error=token_exchange_failed`);
+      return res.redirect(`${env().APP_URL}/integrations?error=token_exchange_failed`);
     }
 
     const tokenData = await tokenRes.json();
@@ -195,10 +199,10 @@ export const googleCallback: RequestHandler = async (req, res) => {
       },
     });
 
-    res.redirect(`${APP_URL}/integrations?connected=google`);
+    res.redirect(`${env().APP_URL}/integrations?connected=google`);
   } catch (error) {
     console.error("Google callback error:", error);
-    res.redirect(`${APP_URL}/integrations?error=callback_failed`);
+    res.redirect(`${env().APP_URL}/integrations?error=callback_failed`);
   }
 };
 
@@ -209,12 +213,12 @@ export const githubAuth: RequestHandler = (req, res) => {
   const userId = (req as any).user?.id;
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!GITHUB_CLIENT_ID) {
+  if (!env().GITHUB_CLIENT_ID) {
     return res.status(500).json({ error: "GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env" });
   }
 
   const params = new URLSearchParams({
-    client_id: GITHUB_CLIENT_ID,
+    client_id: env().GITHUB_CLIENT_ID,
     redirect_uri: githubRedirectUri(),
     scope: "repo read:user user:email",
     state: String(userId),
@@ -230,7 +234,7 @@ export const githubCallback: RequestHandler = async (req, res) => {
     const userId = parseInt(req.query.state as string);
 
     if (!code || !userId) {
-      return res.redirect(`${APP_URL}/integrations?error=missing_params`);
+      return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
     }
 
     // Exchange code for token
@@ -241,8 +245,8 @@ export const githubCallback: RequestHandler = async (req, res) => {
         Accept: "application/json",
       },
       body: JSON.stringify({
-        client_id: GITHUB_CLIENT_ID,
-        client_secret: GITHUB_CLIENT_SECRET,
+        client_id: env().GITHUB_CLIENT_ID,
+        client_secret: env().GITHUB_CLIENT_SECRET,
         code,
         redirect_uri: githubRedirectUri(),
       }),
@@ -251,14 +255,14 @@ export const githubCallback: RequestHandler = async (req, res) => {
     if (!tokenRes.ok) {
       const err = await tokenRes.text();
       console.error("GitHub token exchange failed:", err);
-      return res.redirect(`${APP_URL}/integrations?error=token_exchange_failed`);
+      return res.redirect(`${env().APP_URL}/integrations?error=token_exchange_failed`);
     }
 
     const tokenData = await tokenRes.json();
 
     if (tokenData.error) {
       console.error("GitHub token error:", tokenData.error_description);
-      return res.redirect(`${APP_URL}/integrations?error=${tokenData.error}`);
+      return res.redirect(`${env().APP_URL}/integrations?error=${tokenData.error}`);
     }
 
     // Get user info for account label
@@ -295,10 +299,10 @@ export const githubCallback: RequestHandler = async (req, res) => {
       },
     });
 
-    res.redirect(`${APP_URL}/integrations?connected=github`);
+    res.redirect(`${env().APP_URL}/integrations?connected=github`);
   } catch (error) {
     console.error("GitHub callback error:", error);
-    res.redirect(`${APP_URL}/integrations?error=callback_failed`);
+    res.redirect(`${env().APP_URL}/integrations?error=callback_failed`);
   }
 };
 
@@ -323,8 +327,8 @@ export const googleDriveFiles: RequestHandler = async (req, res) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: GOOGLE_CLIENT_ID,
-          client_secret: GOOGLE_CLIENT_SECRET,
+          client_id: env().GOOGLE_CLIENT_ID,
+          client_secret: env().GOOGLE_CLIENT_SECRET,
           refresh_token: token.refreshToken,
           grant_type: "refresh_token",
         }),
