@@ -710,7 +710,7 @@ export const figmaAuth: RequestHandler = (req, res) => {
   const params = new URLSearchParams({
     client_id: env().FIGMA_CLIENT_ID,
     redirect_uri: figmaRedirectUri(),
-    scope: "files:read",
+    scope: "file_content:read",
     state: String(userId),
     response_type: "code",
   });
@@ -723,12 +723,14 @@ export const figmaCallback: RequestHandler = async (req, res) => {
     const userId = parseInt(req.query.state as string);
     if (!code || !userId) return res.redirect(`${env().APP_URL}/integrations?error=missing_params`);
 
-    const tokenRes = await fetch("https://www.figma.com/api/oauth/token", {
+    const basicAuth = Buffer.from(`${env().FIGMA_CLIENT_ID}:${env().FIGMA_CLIENT_SECRET}`).toString("base64");
+    const tokenRes = await fetch("https://api.figma.com/v1/oauth/token", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basicAuth}`,
+      },
       body: new URLSearchParams({
-        client_id: env().FIGMA_CLIENT_ID,
-        client_secret: env().FIGMA_CLIENT_SECRET,
         redirect_uri: figmaRedirectUri(),
         code,
         grant_type: "authorization_code",
@@ -772,7 +774,7 @@ export const figmaCallback: RequestHandler = async (req, res) => {
   }
 };
 
-// GET /api/integrations/figma/files — list recent Figma files
+// GET /api/integrations/figma/files — list recent Figma files via me → teams → projects → files
 export const figmaFiles: RequestHandler = async (req, res) => {
   try {
     const userId = (req as any).user?.id;
@@ -782,26 +784,55 @@ export const figmaFiles: RequestHandler = async (req, res) => {
     });
     if (!token) return res.status(404).json({ error: "Figma not connected" });
 
-    const filesRes = await fetch("https://api.figma.com/v1/me/files?page_size=15", {
-      headers: { Authorization: `Bearer ${token.accessToken}` },
-    });
-    if (!filesRes.ok) return res.status(filesRes.status).json({ error: "Figma API error" });
+    const headers = { Authorization: `Bearer ${token.accessToken}` };
 
-    const data = await filesRes.json();
-    const projects = data.projects || [];
-    const files: any[] = [];
-    for (const proj of projects) {
-      for (const file of proj.files || []) {
-        files.push({
-          id: file.key,
-          name: file.name,
-          thumbnailUrl: file.thumbnail_url,
-          lastModified: file.last_modified,
-          url: `https://www.figma.com/file/${file.key}`,
-          projectName: proj.name,
-        });
-      }
+    // Step 1: Get current user to find teams
+    const meRes = await fetch("https://api.figma.com/v1/me", { headers });
+    if (!meRes.ok) {
+      const err = await meRes.text();
+      console.error("Figma /me error:", err);
+      return res.status(meRes.status).json({ error: "Figma API error" });
     }
+
+    // Step 2: Get recent files using the files endpoint (available with file_content:read)
+    // Figma doesn't have a "list all files" endpoint, so we use the user's recent files
+    // via the /v1/me endpoint which returns team_ids, then fetch projects per team
+    const me = await meRes.json();
+    const teamIds: string[] = Object.keys(me.teams || {});
+
+    const files: any[] = [];
+
+    // Fetch projects for each team (limit to first 3 teams to avoid rate limits)
+    for (const teamId of teamIds.slice(0, 3)) {
+      try {
+        const projRes = await fetch(`https://api.figma.com/v1/teams/${teamId}/projects`, { headers });
+        if (!projRes.ok) continue;
+        const projData = await projRes.json();
+
+        // Fetch files for each project (limit to first 5 projects per team)
+        for (const project of (projData.projects || []).slice(0, 5)) {
+          try {
+            const filesRes = await fetch(`https://api.figma.com/v1/projects/${project.id}/files`, { headers });
+            if (!filesRes.ok) continue;
+            const filesData = await filesRes.json();
+
+            for (const file of filesData.files || []) {
+              files.push({
+                id: file.key,
+                name: file.name,
+                thumbnailUrl: file.thumbnail_url,
+                lastModified: file.last_modified,
+                url: `https://www.figma.com/file/${file.key}`,
+                projectName: project.name,
+              });
+            }
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    }
+
+    // Sort by last modified, return top 20
+    files.sort((a, b) => new Date(b.lastModified || 0).getTime() - new Date(a.lastModified || 0).getTime());
     res.json(files.slice(0, 20));
   } catch (error) {
     console.error("Error fetching Figma files:", error);
