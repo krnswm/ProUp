@@ -710,7 +710,7 @@ export const figmaAuth: RequestHandler = (req, res) => {
   const params = new URLSearchParams({
     client_id: env().FIGMA_CLIENT_ID,
     redirect_uri: figmaRedirectUri(),
-    scope: "file_content:read",
+    scope: "current_user:read,file_content:read,file_metadata:read,projects:read",
     state: String(userId),
     response_type: "code",
   });
@@ -786,30 +786,21 @@ export const figmaFiles: RequestHandler = async (req, res) => {
 
     const headers = { Authorization: `Bearer ${token.accessToken}` };
 
-    // Step 1: Get current user to find teams
+    // Get current user info (includes team memberships)
     const meRes = await fetch("https://api.figma.com/v1/me", { headers });
-    if (!meRes.ok) {
-      const err = await meRes.text();
-      console.error("Figma /me error:", err);
-      return res.status(meRes.status).json({ error: "Figma API error" });
-    }
-
-    // Step 2: Get recent files using the files endpoint (available with file_content:read)
-    // Figma doesn't have a "list all files" endpoint, so we use the user's recent files
-    // via the /v1/me endpoint which returns team_ids, then fetch projects per team
+    if (!meRes.ok) return res.status(meRes.status).json({ error: "Figma API error" });
     const me = await meRes.json();
-    const teamIds: string[] = Object.keys(me.teams || {});
 
     const files: any[] = [];
 
-    // Fetch projects for each team (limit to first 3 teams to avoid rate limits)
+    // Try teams → projects → files chain
+    const teamIds: string[] = Object.keys(me.teams || {});
     for (const teamId of teamIds.slice(0, 3)) {
       try {
         const projRes = await fetch(`https://api.figma.com/v1/teams/${teamId}/projects`, { headers });
         if (!projRes.ok) continue;
         const projData = await projRes.json();
 
-        // Fetch files for each project (limit to first 5 projects per team)
         for (const project of (projData.projects || []).slice(0, 5)) {
           try {
             const filesRes = await fetch(`https://api.figma.com/v1/projects/${project.id}/files`, { headers });
@@ -822,7 +813,7 @@ export const figmaFiles: RequestHandler = async (req, res) => {
                 name: file.name,
                 thumbnailUrl: file.thumbnail_url,
                 lastModified: file.last_modified,
-                url: `https://www.figma.com/file/${file.key}`,
+                url: `https://www.figma.com/design/${file.key}`,
                 projectName: project.name,
               });
             }
@@ -831,7 +822,6 @@ export const figmaFiles: RequestHandler = async (req, res) => {
       } catch { /* skip */ }
     }
 
-    // Sort by last modified, return top 20
     files.sort((a, b) => new Date(b.lastModified || 0).getTime() - new Date(a.lastModified || 0).getTime());
     res.json(files.slice(0, 20));
   } catch (error) {
