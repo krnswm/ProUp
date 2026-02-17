@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plug, Search, Check, Unplug, ArrowLeft, Zap, Shield, ExternalLink, Loader2, AlertCircle, FolderOpen, GitPullRequest } from "lucide-react";
+import { Plug, Search, Check, Unplug, ArrowLeft, Zap, Shield, ExternalLink, Loader2, AlertCircle, FolderOpen, GitPullRequest, Calendar, Mail, Clock, MapPin, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/MainLayout";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 interface IntegrationProvider {
   id: string;
+  provider: string;
   name: string;
   description: string;
   icon: string;
@@ -21,42 +22,32 @@ interface IntegrationProvider {
   accountLabel: string | null;
   connectedAt: string | null;
   scope: string | null;
+  dataEndpoint: string;
 }
 
-interface DriveFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  modifiedTime: string;
-  webViewLink: string;
-  iconLink?: string;
-  size?: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PanelData = any[];
 
-interface GithubRepo {
-  id: number;
-  name: string;
-  description: string | null;
-  url: string;
-  language: string | null;
-  stars: number;
-  updatedAt: string;
-  private: boolean;
-}
+const CATEGORIES = [
+  { key: "all", label: "All" },
+  { key: "storage", label: "Storage" },
+  { key: "productivity", label: "Productivity" },
+  { key: "communication", label: "Communication" },
+  { key: "development", label: "Development" },
+];
 
 export default function Integrations() {
   const [providers, setProviders] = useState<IntegrationProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
-  // Data panels
-  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
-  const [driveLoading, setDriveLoading] = useState(false);
-  const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
-  const [githubLoading, setGithubLoading] = useState(false);
+  // Per-card data panels
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [panelData, setPanelData] = useState<PanelData>([]);
+  const [panelLoading, setPanelLoading] = useState(false);
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -80,7 +71,6 @@ export default function Integrations() {
     if (connected) {
       toast.success(`${connected.charAt(0).toUpperCase() + connected.slice(1)} connected successfully!`);
       fetchProviders();
-      // Clean URL
       window.history.replaceState({}, "", "/integrations");
     }
     if (error) {
@@ -90,32 +80,36 @@ export default function Integrations() {
   }, [searchParams, fetchProviders]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return providers;
-    const q = searchQuery.toLowerCase();
-    return providers.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-    );
-  }, [providers, searchQuery]);
+    let list = providers;
+    if (activeCategory !== "all") {
+      list = list.filter((p) => p.category === activeCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [providers, activeCategory, searchQuery]);
 
-  const connectedCount = providers.filter((p) => p.connected).length;
+  const connectedCount = new Set(providers.filter((p) => p.connected).map((p) => p.provider)).size;
 
-  // Real OAuth connect — gets auth URL from server, redirects browser
+  // OAuth connect — uses the provider field (google/github) for the auth URL
   const handleConnect = async (provider: IntegrationProvider) => {
     if (!provider.configured) {
-      toast.error(`${provider.name} is not configured. Add ${provider.id.toUpperCase()}_CLIENT_ID and ${provider.id.toUpperCase()}_CLIENT_SECRET to your .env file.`);
+      toast.error(`${provider.name} is not configured. Add the required credentials to your .env file.`);
       return;
     }
-
     setConnectingId(provider.id);
     try {
-      const res = await api(`/api/integrations/${provider.id}/auth`);
+      const res = await api(`/api/integrations/${provider.provider}/auth`);
       if (res.ok) {
         const data = await res.json();
         if (data.url) {
-          // Redirect to OAuth provider
           window.location.href = data.url;
           return;
         }
@@ -130,51 +124,237 @@ export default function Integrations() {
 
   const handleDisconnect = async (provider: IntegrationProvider) => {
     try {
-      const res = await api(`/api/integrations/${provider.id}`, { method: "DELETE" });
+      const res = await api(`/api/integrations/${provider.provider}`, { method: "DELETE" });
       if (res.ok) {
         toast(`${provider.name} disconnected`);
         fetchProviders();
-        if (activePanel === provider.id) setActivePanel(null);
+        setActivePanel(null);
       }
     } catch {
       toast.error("Failed to disconnect");
     }
   };
 
-  // Fetch Google Drive files
-  const fetchDriveFiles = async () => {
-    setDriveLoading(true);
+  // Fetch data for any panel using its dataEndpoint
+  const fetchPanelData = useCallback(async (endpoint: string) => {
+    setPanelLoading(true);
+    setPanelData([]);
     try {
-      const res = await api("/api/integrations/google/drive/files?pageSize=15");
+      const res = await api(endpoint);
       if (res.ok) {
         const data = await res.json();
-        setDriveFiles(Array.isArray(data) ? data : []);
+        setPanelData(Array.isArray(data) ? data : []);
       }
     } catch { /* ignore */ }
-    setDriveLoading(false);
-  };
+    setPanelLoading(false);
+  }, []);
 
-  // Fetch GitHub repos
-  const fetchGithubRepos = async () => {
-    setGithubLoading(true);
-    try {
-      const res = await api("/api/integrations/github/repos?perPage=15");
-      if (res.ok) {
-        const data = await res.json();
-        setGithubRepos(Array.isArray(data) ? data : []);
-      }
-    } catch { /* ignore */ }
-    setGithubLoading(false);
-  };
-
-  const togglePanel = (providerId: string) => {
-    if (activePanel === providerId) {
+  const togglePanel = (provider: IntegrationProvider) => {
+    if (activePanel === provider.id) {
       setActivePanel(null);
       return;
     }
-    setActivePanel(providerId);
-    if (providerId === "google") fetchDriveFiles();
-    if (providerId === "github") fetchGithubRepos();
+    setActivePanel(provider.id);
+    fetchPanelData(provider.dataEndpoint);
+  };
+
+  // Render data panel content based on which integration is active
+  const renderPanelContent = () => {
+    if (!activePanel) return null;
+    const provider = providers.find((p) => p.id === activePanel);
+    if (!provider) return null;
+
+    const panelConfig: Record<string, { title: string; icon: React.ReactNode; renderItem: (item: any, i: number) => React.ReactNode }> = {
+      "google-drive": {
+        title: "Google Drive — Recent Files",
+        icon: <FolderOpen className="w-4 h-4 text-blue-500" />,
+        renderItem: (file) => (
+          <a
+            key={file.id}
+            href={file.webViewLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
+          >
+            {file.iconLink && <img src={file.iconLink} alt="" className="w-5 h-5" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{file.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {file.modifiedTime && new Date(file.modifiedTime).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                {file.size && ` · ${(parseInt(file.size) / 1024).toFixed(0)} KB`}
+              </p>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
+        ),
+      },
+      "google-calendar": {
+        title: "Google Calendar — Upcoming Events",
+        icon: <Calendar className="w-4 h-4 text-green-500" />,
+        renderItem: (event) => (
+          <a
+            key={event.id}
+            href={event.htmlLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
+          >
+            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex flex-col items-center justify-center flex-shrink-0">
+              {event.start ? (
+                <>
+                  <span className="text-[9px] font-bold text-green-600 uppercase">
+                    {new Date(event.start).toLocaleDateString(undefined, { month: "short" })}
+                  </span>
+                  <span className="text-sm font-bold text-green-700 dark:text-green-400 -mt-0.5">
+                    {new Date(event.start).getDate()}
+                  </span>
+                </>
+              ) : (
+                <Calendar className="w-4 h-4 text-green-500" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{event.title}</p>
+              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                {event.start && !event.allDay && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(event.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                    {event.end && ` – ${new Date(event.end).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`}
+                  </span>
+                )}
+                {event.allDay && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded">All day</span>
+                )}
+                {event.location && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {event.location}
+                  </span>
+                )}
+                {event.attendees > 0 && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {event.attendees}
+                  </span>
+                )}
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+          </a>
+        ),
+      },
+      "google-gmail": {
+        title: "Gmail — Recent Emails",
+        icon: <Mail className="w-4 h-4 text-red-500" />,
+        renderItem: (msg) => (
+          <a
+            key={msg.id}
+            href={msg.htmlLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-start gap-3 p-3 rounded-xl border transition-colors group ${
+              msg.unread
+                ? "border-blue-500/20 bg-blue-500/[0.02] hover:bg-blue-500/[0.05]"
+                : "border-border hover:bg-secondary/30"
+            }`}
+          >
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+              msg.unread ? "bg-blue-500/15 text-blue-600" : "bg-secondary text-muted-foreground"
+            }`}>
+              {(msg.from || "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className={`text-sm truncate ${msg.unread ? "font-bold text-foreground" : "font-medium text-foreground"}`}>
+                  {msg.subject}
+                </p>
+                {msg.unread && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{msg.from}</p>
+              <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">{msg.snippet}</p>
+            </div>
+            <span className="text-[10px] text-muted-foreground flex-shrink-0 mt-0.5">
+              {msg.date && new Date(msg.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
+          </a>
+        ),
+      },
+      "github": {
+        title: "GitHub — Your Repositories",
+        icon: <GitPullRequest className="w-4 h-4 text-gray-700 dark:text-gray-300" />,
+        renderItem: (repo) => (
+          <a
+            key={repo.id}
+            href={repo.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{repo.name}</p>
+                {repo.private && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded">Private</span>
+                )}
+              </div>
+              {repo.description && (
+                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{repo.description}</p>
+              )}
+              <div className="flex items-center gap-3 mt-1">
+                {repo.language && <span className="text-[10px] text-muted-foreground">{repo.language}</span>}
+                <span className="text-[10px] text-muted-foreground">&#11088; {repo.stars}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Updated {new Date(repo.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </span>
+              </div>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          </a>
+        ),
+      },
+    };
+
+    const config = panelConfig[activePanel];
+    if (!config) return null;
+
+    return (
+      <motion.div
+        key={activePanel}
+        className="bg-card border border-border rounded-2xl p-5 shadow-lg mt-6"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            {config.icon}
+            {config.title}
+          </h3>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fetchPanelData(provider.dataEndpoint)}
+            disabled={panelLoading}
+          >
+            {panelLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Refresh"}
+          </Button>
+        </div>
+
+        {panelLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : panelData.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-6">No data found</p>
+        ) : (
+          <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            {panelData.map((item, i) => config.renderItem(item, i))}
+          </div>
+        )}
+      </motion.div>
+    );
   };
 
   return (
@@ -194,7 +374,7 @@ export default function Integrations() {
               </h1>
             </div>
             <p className="text-muted-foreground text-sm max-w-xl">
-              Connect external tools to ProUp via OAuth 2.0. Access your Google Drive files, GitHub repos, and more — all from one place.
+              Connect external tools to ProUp via OAuth 2.0. Access your Drive files, Calendar events, Gmail, GitHub repos — each independently.
             </p>
 
             <div className="flex items-center gap-4 mt-4">
@@ -204,14 +384,14 @@ export default function Integrations() {
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 border border-border rounded-xl">
                 <Plug className="w-4 h-4 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground">{providers.length} Available</span>
+                <span className="text-xs font-semibold text-muted-foreground">{providers.length} Services</span>
               </div>
             </div>
           </motion.div>
 
-          {/* Search */}
-          <div className="mb-6">
-            <div className="relative max-w-sm">
+          {/* Search + Category filter */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
@@ -219,6 +399,22 @@ export default function Integrations() {
                 placeholder="Search integrations..."
                 className="pl-9 rounded-xl"
               />
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => setActiveCategory(cat.key)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    activeCategory === cat.key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -230,7 +426,7 @@ export default function Integrations() {
           ) : (
             <>
               {/* Integration cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                 {filtered.map((provider, i) => (
                   <motion.div
                     key={provider.id}
@@ -238,7 +434,7 @@ export default function Integrations() {
                       provider.connected
                         ? "border-green-500/30 bg-green-500/[0.02]"
                         : "border-border hover:border-primary/20"
-                    }`}
+                    } ${activePanel === provider.id ? "ring-2 ring-primary/30" : ""}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
@@ -252,7 +448,7 @@ export default function Integrations() {
                     )}
 
                     {/* Not configured warning */}
-                    {!provider.configured && (
+                    {!provider.configured && !provider.connected && (
                       <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
                         <AlertCircle className="w-3 h-3 text-amber-500" />
                         <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">Not configured</span>
@@ -308,7 +504,7 @@ export default function Integrations() {
                             variant="outline"
                             size="sm"
                             className="flex-1"
-                            onClick={() => togglePanel(provider.id)}
+                            onClick={() => togglePanel(provider)}
                           >
                             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
                             {activePanel === provider.id ? "Hide Data" : "Browse Data"}
@@ -356,141 +552,10 @@ export default function Integrations() {
                 </div>
               )}
 
-              {/* Data panels */}
-              <AnimatePresence>
-                {activePanel === "google" && (
-                  <motion.div
-                    className="bg-card border border-border rounded-2xl p-5 shadow-lg"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                        <FolderOpen className="w-4 h-4 text-blue-500" />
-                        Google Drive — Recent Files
-                      </h3>
-                      <Button type="button" variant="outline" size="sm" onClick={fetchDriveFiles} disabled={driveLoading}>
-                        {driveLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Refresh"}
-                      </Button>
-                    </div>
-
-                    {driveLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : driveFiles.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-6">No files found</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {driveFiles.map((file) => (
-                          <a
-                            key={file.id}
-                            href={file.webViewLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
-                          >
-                            {file.iconLink && <img src={file.iconLink} alt="" className="w-5 h-5" />}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{file.name}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {new Date(file.modifiedTime).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                                {file.size && ` · ${(parseInt(file.size) / 1024).toFixed(0)} KB`}
-                              </p>
-                            </div>
-                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-
-                {activePanel === "github" && (
-                  <motion.div
-                    className="bg-card border border-border rounded-2xl p-5 shadow-lg"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                        <GitPullRequest className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-                        GitHub — Your Repositories
-                      </h3>
-                      <Button type="button" variant="outline" size="sm" onClick={fetchGithubRepos} disabled={githubLoading}>
-                        {githubLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Refresh"}
-                      </Button>
-                    </div>
-
-                    {githubLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : githubRepos.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-6">No repositories found</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {githubRepos.map((repo) => (
-                          <a
-                            key={repo.id}
-                            href={repo.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-secondary/30 transition-colors group"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{repo.name}</p>
-                                {repo.private && (
-                                  <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border border-amber-500/20 rounded">Private</span>
-                                )}
-                              </div>
-                              {repo.description && (
-                                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{repo.description}</p>
-                              )}
-                              <div className="flex items-center gap-3 mt-1">
-                                {repo.language && (
-                                  <span className="text-[10px] text-muted-foreground">{repo.language}</span>
-                                )}
-                                <span className="text-[10px] text-muted-foreground">⭐ {repo.stars}</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  Updated {new Date(repo.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                                </span>
-                              </div>
-                            </div>
-                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
+              {/* Data panel */}
+              <AnimatePresence mode="wait">
+                {renderPanelContent()}
               </AnimatePresence>
-
-              {/* Setup instructions */}
-              <div className="mt-8 p-5 bg-secondary/20 border border-border rounded-2xl">
-                <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-primary" />
-                  Setup Instructions
-                </h3>
-                <p className="text-xs text-muted-foreground mb-3">
-                  To enable real OAuth connections, add these environment variables to your <code className="px-1.5 py-0.5 bg-secondary rounded text-[11px]">.env</code> file:
-                </p>
-                <pre className="text-[11px] bg-background border border-border rounded-xl p-4 overflow-x-auto font-mono text-muted-foreground leading-relaxed">
-{`# Google OAuth (console.cloud.google.com)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-
-# GitHub OAuth (github.com/settings/developers)
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-
-# App URL (for OAuth redirect)
-APP_URL=http://localhost:8080`}
-                </pre>
-              </div>
             </>
           )}
         </div>

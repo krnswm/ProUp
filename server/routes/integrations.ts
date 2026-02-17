@@ -38,40 +38,78 @@ export const listIntegrations: RequestHandler = async (req, res) => {
       },
     });
 
-    // Build response with available providers
-    const providers = [
+    const googleToken = tokens.find((t) => t.provider === "google");
+    const githubToken = tokens.find((t) => t.provider === "github");
+    const googleConfigured = !!env().GOOGLE_CLIENT_ID;
+    const githubConfigured = !!env().GITHUB_CLIENT_ID;
+
+    // Build response — Google split into Drive, Calendar, Gmail (share one OAuth token)
+    const result = [
       {
-        id: "google",
-        name: "Google",
-        description: "Google Drive, Gmail, Calendar — access files, emails, and events",
-        icon: "🔵",
-        category: "productivity",
+        id: "google-drive",
+        provider: "google",
+        name: "Google Drive",
+        description: "Access and browse your Google Drive files, docs, sheets, and presentations",
+        icon: "📁",
+        category: "storage",
         color: "#4285f4",
-        features: ["Google Drive files", "Gmail access", "Calendar events", "Contacts"],
-        configured: !!env().GOOGLE_CLIENT_ID,
+        features: ["Browse files", "Recent documents", "Search files", "View in Drive"],
+        configured: googleConfigured,
+        connected: !!googleToken,
+        accountLabel: googleToken?.accountLabel || null,
+        connectedAt: googleToken?.createdAt || null,
+        scope: googleToken?.scope || null,
+        dataEndpoint: "/api/integrations/google/drive/files",
+      },
+      {
+        id: "google-calendar",
+        provider: "google",
+        name: "Google Calendar",
+        description: "View upcoming events, meetings, and deadlines from your Google Calendar",
+        icon: "�",
+        category: "productivity",
+        color: "#0f9d58",
+        features: ["Upcoming events", "Meeting details", "Event links", "All-day events"],
+        configured: googleConfigured,
+        connected: !!googleToken,
+        accountLabel: googleToken?.accountLabel || null,
+        connectedAt: googleToken?.createdAt || null,
+        scope: googleToken?.scope || null,
+        dataEndpoint: "/api/integrations/google/calendar/events",
+      },
+      {
+        id: "google-gmail",
+        provider: "google",
+        name: "Gmail",
+        description: "View recent emails and threads from your Gmail inbox",
+        icon: "✉️",
+        category: "communication",
+        color: "#ea4335",
+        features: ["Recent emails", "Inbox threads", "Sender info", "Open in Gmail"],
+        configured: googleConfigured,
+        connected: !!googleToken,
+        accountLabel: googleToken?.accountLabel || null,
+        connectedAt: googleToken?.createdAt || null,
+        scope: googleToken?.scope || null,
+        dataEndpoint: "/api/integrations/google/gmail/messages",
       },
       {
         id: "github",
+        provider: "github",
         name: "GitHub",
         description: "Repositories, pull requests, issues — link code to tasks",
         icon: "🐙",
         category: "development",
         color: "#24292e",
         features: ["List repositories", "Pull requests", "Issues", "Commit history"],
-        configured: !!env().GITHUB_CLIENT_ID,
+        configured: githubConfigured,
+        connected: !!githubToken,
+        accountLabel: githubToken?.accountLabel || null,
+        connectedAt: githubToken?.createdAt || null,
+        scope: githubToken?.scope || null,
+        dataEndpoint: "/api/integrations/github/repos",
       },
     ];
-
-    const result = providers.map((p) => {
-      const token = tokens.find((t) => t.provider === p.id);
-      return {
-        ...p,
-        connected: !!token,
-        accountLabel: token?.accountLabel || null,
-        connectedAt: token?.createdAt || null,
-        scope: token?.scope || null,
-      };
-    });
 
     res.json(result);
   } catch (error) {
@@ -306,6 +344,42 @@ export const githubCallback: RequestHandler = async (req, res) => {
   }
 };
 
+// ── Google token helper ──────────────────────────────────────────
+async function getGoogleAccessToken(userId: number): Promise<{ accessToken: string } | null> {
+  const token = await prisma.oAuthToken.findUnique({
+    where: { userId_provider: { userId, provider: "google" } },
+  });
+  if (!token) return null;
+
+  let accessToken = token.accessToken;
+  if (token.expiresAt && new Date(token.expiresAt) < new Date() && token.refreshToken) {
+    const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: env().GOOGLE_CLIENT_ID,
+        client_secret: env().GOOGLE_CLIENT_SECRET,
+        refresh_token: token.refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+    if (refreshRes.ok) {
+      const refreshData = await refreshRes.json();
+      accessToken = refreshData.access_token;
+      await prisma.oAuthToken.update({
+        where: { id: token.id },
+        data: {
+          accessToken,
+          expiresAt: refreshData.expires_in
+            ? new Date(Date.now() + refreshData.expires_in * 1000)
+            : undefined,
+        },
+      });
+    }
+  }
+  return { accessToken };
+}
+
 // ── Google Drive API proxy ──────────────────────────────────────
 
 // GET /api/integrations/google/drive/files — list recent Drive files
@@ -314,39 +388,8 @@ export const googleDriveFiles: RequestHandler = async (req, res) => {
     const userId = (req as any).user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const token = await prisma.oAuthToken.findUnique({
-      where: { userId_provider: { userId, provider: "google" } },
-    });
-
-    if (!token) return res.status(404).json({ error: "Google not connected" });
-
-    // Refresh token if expired
-    let accessToken = token.accessToken;
-    if (token.expiresAt && new Date(token.expiresAt) < new Date() && token.refreshToken) {
-      const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: env().GOOGLE_CLIENT_ID,
-          client_secret: env().GOOGLE_CLIENT_SECRET,
-          refresh_token: token.refreshToken,
-          grant_type: "refresh_token",
-        }),
-      });
-      if (refreshRes.ok) {
-        const refreshData = await refreshRes.json();
-        accessToken = refreshData.access_token;
-        await prisma.oAuthToken.update({
-          where: { id: token.id },
-          data: {
-            accessToken,
-            expiresAt: refreshData.expires_in
-              ? new Date(Date.now() + refreshData.expires_in * 1000)
-              : undefined,
-          },
-        });
-      }
-    }
+    const google = await getGoogleAccessToken(userId);
+    if (!google) return res.status(404).json({ error: "Google not connected" });
 
     const query = (req.query.q as string) || "";
     const pageSize = parseInt(req.query.pageSize as string) || 20;
@@ -359,7 +402,7 @@ export const googleDriveFiles: RequestHandler = async (req, res) => {
     if (query) params.set("q", `name contains '${query.replace(/'/g, "\\'")}'`);
 
     const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${google.accessToken}` },
     });
 
     if (!driveRes.ok) {
@@ -373,6 +416,120 @@ export const googleDriveFiles: RequestHandler = async (req, res) => {
   } catch (error) {
     console.error("Error fetching Drive files:", error);
     res.status(500).json({ error: "Failed to fetch Drive files" });
+  }
+};
+
+// ── Google Calendar API proxy ───────────────────────────────────
+
+// GET /api/integrations/google/calendar/events — list upcoming events
+export const googleCalendarEvents: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const google = await getGoogleAccessToken(userId);
+    if (!google) return res.status(404).json({ error: "Google not connected" });
+
+    const maxResults = parseInt(req.query.maxResults as string) || 15;
+    const params = new URLSearchParams({
+      maxResults: String(maxResults),
+      orderBy: "startTime",
+      singleEvents: "true",
+      timeMin: new Date().toISOString(),
+      fields: "items(id,summary,description,start,end,htmlLink,location,status,creator,attendees)",
+    });
+
+    const calRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+      headers: { Authorization: `Bearer ${google.accessToken}` },
+    });
+
+    if (!calRes.ok) {
+      const err = await calRes.text();
+      console.error("Calendar API error:", err);
+      return res.status(calRes.status).json({ error: "Calendar API error" });
+    }
+
+    const data = await calRes.json();
+    res.json(
+      (data.items || []).map((e: any) => ({
+        id: e.id,
+        title: e.summary || "(No title)",
+        description: e.description || null,
+        location: e.location || null,
+        start: e.start?.dateTime || e.start?.date || null,
+        end: e.end?.dateTime || e.end?.date || null,
+        allDay: !e.start?.dateTime,
+        htmlLink: e.htmlLink,
+        status: e.status,
+        creator: e.creator?.email || null,
+        attendees: (e.attendees || []).length,
+      }))
+    );
+  } catch (error) {
+    console.error("Error fetching Calendar events:", error);
+    res.status(500).json({ error: "Failed to fetch Calendar events" });
+  }
+};
+
+// ── Gmail API proxy ─────────────────────────────────────────────
+
+// GET /api/integrations/google/gmail/messages — list recent emails
+export const googleGmailMessages: RequestHandler = async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const google = await getGoogleAccessToken(userId);
+    if (!google) return res.status(404).json({ error: "Google not connected" });
+
+    const maxResults = parseInt(req.query.maxResults as string) || 15;
+
+    // List message IDs
+    const listRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&labelIds=INBOX`,
+      { headers: { Authorization: `Bearer ${google.accessToken}` } }
+    );
+
+    if (!listRes.ok) {
+      const err = await listRes.text();
+      console.error("Gmail list error:", err);
+      return res.status(listRes.status).json({ error: "Gmail API error" });
+    }
+
+    const listData = await listRes.json();
+    const messageIds: string[] = (listData.messages || []).map((m: any) => m.id);
+
+    if (messageIds.length === 0) return res.json([]);
+
+    // Fetch each message's metadata in parallel
+    const messages = await Promise.all(
+      messageIds.map(async (id) => {
+        const msgRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${google.accessToken}` } }
+        );
+        if (!msgRes.ok) return null;
+        const msg = await msgRes.json();
+        const headers = msg.payload?.headers || [];
+        const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value || "";
+        return {
+          id: msg.id,
+          threadId: msg.threadId,
+          subject: getHeader("Subject") || "(No subject)",
+          from: getHeader("From"),
+          date: getHeader("Date"),
+          snippet: msg.snippet || "",
+          labelIds: msg.labelIds || [],
+          unread: (msg.labelIds || []).includes("UNREAD"),
+          htmlLink: `https://mail.google.com/mail/u/0/#inbox/${msg.threadId}`,
+        };
+      })
+    );
+
+    res.json(messages.filter(Boolean));
+  } catch (error) {
+    console.error("Error fetching Gmail messages:", error);
+    res.status(500).json({ error: "Failed to fetch Gmail messages" });
   }
 };
 

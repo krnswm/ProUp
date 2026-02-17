@@ -40,6 +40,8 @@ import {
   googleAuth,
   googleCallback,
   googleDriveFiles,
+  googleCalendarEvents,
+  googleGmailMessages,
   githubAuth,
   githubCallback,
   githubRepos,
@@ -173,6 +175,8 @@ export function createServer() {
   app.get("/api/integrations/google/auth", googleAuth);
   app.get("/api/integrations/github/auth", githubAuth);
   app.get("/api/integrations/google/drive/files", googleDriveFiles);
+  app.get("/api/integrations/google/calendar/events", googleCalendarEvents);
+  app.get("/api/integrations/google/gmail/messages", googleGmailMessages);
   app.get("/api/integrations/github/repos", githubRepos);
   app.get("/api/integrations/github/repos/:owner/:repo/pulls", githubPulls);
 
