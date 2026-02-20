@@ -23,6 +23,7 @@ import {
   cancelInvitation,
 } from "./routes/projects";
 import { getDashboardAnalytics } from "./routes/dashboard";
+import { getRetrospectiveData } from "./routes/retrospective";
 import { register, login, forgotPassword, resetPassword, getCurrentUser, logout, getAllUsers } from "./routes/auth";
 import { getWhiteboard, saveWhiteboard } from "./routes/whiteboard";
 import { getDocuments, getDocument, createDocument, updateDocument, deleteDocument } from "./routes/documents";
@@ -130,6 +131,9 @@ export function createServer() {
 
   // Dashboard routes
   app.get("/api/dashboard/analytics", getDashboardAnalytics);
+
+  // Retrospective routes
+  app.get("/api/retrospective/data", getRetrospectiveData);
 
   // Project routes
   app.get("/api/projects", getProjects);

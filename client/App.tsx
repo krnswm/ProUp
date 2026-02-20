@@ -27,6 +27,7 @@ import WeeklyRecap from "./pages/WeeklyRecap";
 import Journal from "./pages/Journal";
 import Integrations from "./pages/Integrations";
 import VirtualPet from "./pages/VirtualPet";
+import SprintRetro from "./pages/SprintRetro";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AmbientPlayer from "@/components/AmbientPlayer";
 import CommandPalette from "@/components/CommandPalette";
@@ -155,6 +156,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <VirtualPet />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/retro"
+              element={
+                <ProtectedRoute>
+                  <SprintRetro />
                 </ProtectedRoute>
               }
             />
